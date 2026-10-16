@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Up'Pina - Back-office</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="entete">
+    <a class="logo" href="#/">
+      <svg class="logo-icone" viewBox="0 0 22 28" aria-hidden="true">
+        <circle cx="11" cy="14" r="8.5" fill="none" stroke="currentColor" stroke-width="3"></circle>
+        <path d="M6.8 15.5L11 11l4.2 4.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+      <span>Up'Pina</span>
+    </a>
+    <nav class="entete-liens">
+      <span class="badge-mode" id="badge-mode" hidden>DONNÉES RÉELLES</span>
+      <a id="lien-news" href="#/whats-new">Quoi de neuf</a>
+      <a id="lien-aide" href="#/help">Centre d'aide</a>
+      <div class="menu-conteneur">
+        <button class="bouton-site" data-ouvre="compte"><span id="nom-site"></span><span class="avatar" id="avatar-site"></span></button>
+        <div class="menu-flottant droite menu-compte" id="menu-compte"></div>
+      </div>
+    </nav>
+    <nav class="onglets" id="onglets"></nav>
+  </header>
+
+  <main id="page"></main>
+
+  <!-- Scripts classiques (pas de import/fetch : compatible double-clic) -->
+  <!-- Facultatif : vraies données, produit par outils\Mettre-a-jour-les-donnees.bat (absent = mode test seulement) -->
+  <script src="donnees-reelles.js" charset="utf-8"></script>
+  <script src="donnees-test.js"></script>
+  <script src="noyau.js"></script>
+  <script src="ecrans-rapports.js"></script>
+  <script src="ecrans-pdv.js"></script>
+  <script src="ecrans-autres.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
