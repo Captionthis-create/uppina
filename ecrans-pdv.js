@@ -87,6 +87,7 @@
       var onglet = ctx.etat.onglet || "gen", erreur = "";
       // Les champs numériques sont gardés en texte pour ne pas perdre la saisie en cours
       var prixTxt = p ? p.prix.toFixed(2).replace(".", ",") : "", achatTxt = p && p.achat !== null ? String(p.achat).replace(".", ",") : "";
+      var achatOuvert = achatTxt !== "";
       function nombre(t) { var n = parseFloat(String(t).replace(",", ".")); return String(t).trim() === "" || !isFinite(n) ? null : n; }
       function ligne(libelle, contenu) { return '<div class="pf-ligne"><div class="pf-lib">' + libelle + '</div><div class="pf-champ">' + contenu + "</div></div>"; }
       function puces(liste, choisis, cle) {
@@ -107,7 +108,12 @@
         return '<span class="pf-marge' + (m && m.marge < 0 ? " neg" : "") + '" id="pf-marge">' + E(texteMarge(m)) + "</span>";
       }
       function contenu() {
-        if (onglet === "tarifs") return '<button type="button" class="bouton" data-nondispo>' + A.icones.plus + " Ajouter un prix</button>";
+        if (onglet === "tarifs") {
+          if (!achat) return '<p class="doux">La gestion des prix d\'achat est désactivée. Activez-la avec le bouton « Prix d\'achat » de la liste des produits.</p>';
+          if (!achatOuvert) return '<div><button type="button" class="bouton" data-ajout-achat>' + A.icones.plus + " Ajouter un prix d'achat</button></div>";
+          return ligne("Prix d'achat", '<div class="pf-prix"><input class="pf-in" data-k="achat" inputmode="decimal" placeholder="0,00" value="' + E(achatTxt) + '"><span class="pf-unite">€ HT</span>' +
+            '<button type="button" class="bouton-icone" data-retire-achat title="Retirer le prix d\'achat">✕</button></div>' + blocMarge());
+        }
         if (onglet === "refs") return ligne("Code-barre",'<input class="pf-in" data-k="codeBarre" value="' + E(f.codeBarre) + '">') + ligne("SKU", '<input class="pf-in" data-k="sku" value="' + E(f.sku) + '">') + ligne("PLU", '<input class="pf-in" data-k="plu" value="' + E(f.plu) + '">');
         if (onglet === "lib") return ligne("Nom du bouton", '<input class="pf-in" data-k="nomBouton" placeholder="Insérez le nom du bouton sur la caisse" value="' + E(f.nomBouton) + '">') + ligne("Nom de préparation", '<input class="pf-in" data-k="nomPrepa" value="' + E(f.nomPrepa) + '">');
         var tvaListe = TAUX_TVA.indexOf(+f.tva) >= 0 ? TAUX_TVA : TAUX_TVA.concat([+f.tva]);
@@ -119,8 +125,7 @@
           ligne("Options", puces(groupes.map(function (g) { return g.nom; }), f.options, "options")) +
           ligne("Prix", '<div class="segment">' + TYPES_PRIX.map(function (t) { return '<button type="button" class="' + (t[0] === f.typePrix ? "actif" : "") + '" data-typeprix="' + t[0] + '">' + t[1] + "</button>"; }).join("") + "</div>") +
           ligne("Normal*", '<div class="pf-prix"><input class="pf-in" data-k="prix" inputmode="decimal" placeholder="0,00" value="' + E(prixTxt) + '"><span class="pf-unite">€ TTC</span><select class="pf-in pf-tva" data-k="tva">' +
-            options(tvaListe.map(function (t) { return [t, "TVA " + String(t).replace(".", ",") + "%"]; }), f.tva) + "</select></div>") +
-          (achat ? ligne("Prix d'achat", '<div class="pf-prix"><input class="pf-in" data-k="achat" inputmode="decimal" placeholder="0,00" value="' + E(achatTxt) + '"><span class="pf-unite">€ HT</span></div>' + blocMarge()) : "");
+            options(tvaListe.map(function (t) { return [t, "TVA " + String(t).replace(".", ",") + "%"]; }), f.tva) + "</select></div>");
       }
       function dessiner() {
         zone.innerHTML = '<div class="carte pf"><h2 class="pf-titre">' + (p ? "Modifier un produit" : "Créer un produit") + "</h2>" +
@@ -133,8 +138,10 @@
       }
       function basculer(liste, v) { var i = liste.indexOf(v); if (i >= 0) liste.splice(i, 1); else liste.push(v); }
       zone.onclick = function (e) {
-        var t = e.target.closest("[data-onglet],[data-puce],[data-niveau],[data-typeprix],[data-annuler],[data-sauver],[data-reset],[data-nondispo]");
+        var t = e.target.closest("[data-onglet],[data-puce],[data-niveau],[data-typeprix],[data-annuler],[data-sauver],[data-reset],[data-nondispo],[data-ajout-achat],[data-retire-achat]");
         if (!t) return;
+        if (t.hasAttribute("data-ajout-achat")) { achatOuvert = true; dessiner(); return; }
+        if (t.hasAttribute("data-retire-achat")) { achatOuvert = false; achatTxt = ""; dessiner(); return; }
         if (t.hasAttribute("data-onglet")) { onglet = ctx.etat.onglet = t.getAttribute("data-onglet"); dessiner(); }
         else if (t.hasAttribute("data-puce")) { basculer(f[t.getAttribute("data-puce")], t.getAttribute("data-val")); dessiner(); }
         else if (t.hasAttribute("data-niveau")) { f.niveau = t.getAttribute("data-niveau"); dessiner(); }
