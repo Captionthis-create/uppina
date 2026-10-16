@@ -178,6 +178,15 @@
     d.setDate(d.getDate() + sens * jours); f.setDate(f.getDate() + sens * jours);
     return { dateStart: jourIso(d), dateEnd: jourIso(f) };
   };
+  // Même période l'an dernier : mois entier -> même mois ; sinon -364 jours (mêmes jours de semaine)
+  App.memePeriodeN1 = function (p) {
+    var d = depuisIso(p.dateStart), f = depuisIso(p.dateEnd);
+    if (estMois(p)) return { dateStart: jourIso(new Date(d.getFullYear() - 1, d.getMonth(), 1)), dateEnd: jourIso(new Date(d.getFullYear() - 1, d.getMonth() + 1, 0)) };
+    d.setDate(d.getDate() - 364); f.setDate(f.getDate() - 364);
+    return { dateStart: jourIso(d), dateEnd: jourIso(f) };
+  };
+  // Mode météo : facultatif, désactivé par défaut, mémorisé dans le navigateur
+  App.meteoActif = function () { try { return localStorage.getItem("meteo-copie") === "1"; } catch (e) { return false; } };
   App.peutAvancer = function (p) { return App.decalerPeriode(p, 1).dateStart <= App.aujourdhui(); };
   App.choixPeriode = function () {
     var j0 = App.periodeJour(0), j1 = App.periodeJour(-1), m = App.periodeMois(), m1 = App.decalerPeriode(m, -1);
@@ -521,6 +530,7 @@
         { label: "Tableau de bord", route: "/reports/dashboard", icone: ICONES.courbe },
         { label: "Caisses en cours", route: "/reports/tills-in-progress", icone: ICONES.direct },
         { label: "Stocks", route: "/reports/stocks", icone: ICONES.stocks },
+        { label: "Prévisions météo", route: "/reports/forecast", icone: ICONES.soleil, meteo: true },
         { groupe: "ventes", label: "Rapports des ventes", icone: ICONES.dossier, items: ventes }
       ]
     },
@@ -566,6 +576,7 @@
     var s = SECTIONS[section];
     var h = '<aside class="barre-laterale"><h3>' + s.titre + "</h3>";
     s.items.forEach(function (it) {
+      if (it.meteo && !App.meteoActif()) return;
       if (it.titre) { h += '<h3 class="sous-titre">' + it.titre + "</h3>"; return; }
       if (!it.groupe) { h += lienMenu(it, chemin, params, section); return; }
       var ouvert = groupesOuverts[it.groupe];
@@ -652,7 +663,7 @@
       '</span><div class="actions">' + actions + "</div></div>" +
       (htmlFiltres ? '<div class="filtres">' + htmlFiltres + "</div>" : "") + "</div>";
 
-    var corps = '<section class="contenu"><div class="contenu-centre ' + (cfg.large ? "large" : "") + '">' + bandeau + '<div id="zone-ecran"></div></div></section>';
+    var corps = '<section class="contenu"><div class="contenu-centre ' + (cfg.large ? "large" : "") + '">' + bandeau + '<div id="zone-meteo"></div><div id="zone-ecran"></div></div></section>';
     document.getElementById("page").innerHTML =
       '<div class="mise-en-page' + (cfg.section ? "" : " sans-barre") + '">' +
       (cfg.section ? '<button class="bouton bouton-menu-lat" data-act="menu-lat">☰ Menu ' + E(SECTIONS[cfg.section].titre) + "</button>" + barreLaterale(cfg.section, chemin, ctx.periode) : "") + corps + "</div>";
@@ -686,6 +697,9 @@
         '<p class="doux hors-api">Cet écran n\'a pas de source de vraies données. Pour le voir avec des données de démonstration, choisissez « Test » dans le menu du compte (bouton en haut à droite › Données).</p></div></div>';
       window.scrollTo(0, 0);
       return;
+    }
+    if (App.meteoActif() && App.meteoBandeau && chemin.indexOf("/reports/sales-report/") === 0 && filtres.indexOf && filtres.indexOf("periode") >= 0) {
+      App.meteoBandeau(ctx, document.getElementById("zone-meteo"));
     }
     cfg.rendre(ctx, zone);
     window.scrollTo(0, 0);
@@ -724,6 +738,10 @@
       '<button class="' + (DonneesTest.mode === "test" ? "actif" : "") + '" data-act="donnees" data-val="test">Test</button>' +
       '<button class="' + (DonneesTest.mode === "reelles" ? "actif" : "") + '" data-act="donnees" data-val="reelles">Réelles</button></div></div>' +
       '<div class="compte-note">' + (DonneesTest.reelDisponible ? "Données réelles du " + E(DonneesTest.recupereLe) : "Pas de données réelles : lancez outils\\Mettre-a-jour-les-donnees.bat") + "</div>" +
+      '<div class="compte-ligne"><span>' + ICONES.soleil + 'Météo</span><div class="segment">' +
+      '<button class="' + (App.meteoActif() ? "" : "actif") + '" data-act="meteo" data-val="0">Off</button>' +
+      '<button class="' + (App.meteoActif() ? "actif" : "") + '" data-act="meteo" data-val="1">On</button></div></div>' +
+      (App.meteoActif() ? '<div class="compte-note">Ville : outils\\meteo-lieu.txt (sinon celle du lieu). Mise à jour : Lancer Up\'Pina.bat.</div>' : "") +
       '<a class="choix-compte" href="#/settings/profile">' + ICONES.engrenage + "Réglages</a>" +
       '<a class="choix-compte" href="#/integrations">' + ICONES.options + "Intégrations</a><hr>" +
       '<button class="choix-compte doux" data-act="nondispo">Conditions d\'utilisation</button>' +
@@ -739,6 +757,10 @@
     App.actGlobal.donnees = function (v) {
       if (v === "reelles" && !DonneesTest.reelDisponible) { App.info("Aucune donnée réelle : lancez outils\\Mettre-a-jour-les-donnees.bat."); return; }
       try { localStorage.setItem("donnees-copie", v); } catch (e) { App.info("Stockage du navigateur indisponible."); return; }
+      location.reload();
+    };
+    App.actGlobal.meteo = function (v) {
+      try { localStorage.setItem("meteo-copie", v); } catch (e) { App.info("Stockage du navigateur indisponible."); return; }
       location.reload();
     };
     App.actGlobal.nondispo = App.nonDispo;

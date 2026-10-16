@@ -1034,9 +1034,81 @@
   }
 
   // ======================================================================
+  // Météo (mode météo facultatif). Vraie météo : fichier meteo.js produit par outils\recuperer-meteo.ps1.
+  // En mode Test, les jours déjà passés sont INVENTÉS (marqués factices) ; aujourd'hui et le futur sont réels.
+  // ======================================================================
+  var METEO = window.MeteoDonnees || null;
+  // Poids du score de clémence (somme = 1) : température, pluie, vent, ensoleillement
+  var METEO_POIDS = { temp: 0.35, pluie: 0.3, vent: 0.1, soleil: 0.25 };
+  function borne(v) { return Math.max(0, Math.min(100, v)); }
+  // Score 0-100 : confort pour un bar-restaurant (terrasse). Idéal : 21-28 °C, sec, peu de vent, soleil.
+  function scoreMeteo(m) {
+    if (!m || m.tmax == null) return null;
+    var dist = m.tmax < 21 ? 21 - m.tmax : (m.tmax > 28 ? m.tmax - 28 : 0);
+    var sTemp = borne(100 - dist * 5);
+    var sPluie = borne(100 - (m.pluie || 0) * 12);
+    var sVent = borne(100 - Math.max(0, (m.vent || 0) - 15) * 3);
+    var sSoleil = m.soleil == null ? 50 : borne(m.soleil / 10 * 100);
+    return Math.round(sTemp * METEO_POIDS.temp + sPluie * METEO_POIDS.pluie + sVent * METEO_POIDS.vent + sSoleil * METEO_POIDS.soleil);
+  }
+  // Hasard stable par date (n'utilise pas le générateur principal : les fausses commandes ne changent pas)
+  function hasard(iso, k) {
+    var h = 2166136261, s = iso + "#" + k;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return ((h >>> 0) % 100000) / 100000;
+  }
+  function fausseMeteo(iso) {
+    var d = new Date(iso + "T12:00:00"), an = new Date(d.getFullYear(), 0, 0);
+    var jourAn = Math.round((d - an) / 86400000);
+    var saison = -Math.cos((jourAn - 15) / 365 * 2 * Math.PI); // -1 en janvier, +1 en juillet
+    var tmax = Math.round((15 + 9 * saison + (hasard(iso, 1) - 0.5) * 9) * 10) / 10;
+    var pluvieux = hasard(iso, 2) < 0.32 - 0.1 * saison;
+    var pluie = pluvieux ? Math.round(hasard(iso, 3) * 120) / 10 : 0;
+    var soleil = Math.round(Math.max(0, (pluvieux ? 1 + hasard(iso, 4) * 3 : 4 + hasard(iso, 4) * 7) * (0.6 + 0.4 * (saison + 1) / 2)) * 10) / 10;
+    var vent = Math.round((8 + hasard(iso, 5) * 28) * 10) / 10;
+    var code = pluie > 5 ? 63 : (pluie > 0 ? 61 : (soleil > 8 ? 0 : (soleil > 5 ? 2 : 3)));
+    return { tmax: tmax, tmin: Math.round((tmax - 4 - hasard(iso, 6) * 5) * 10) / 10, pluie: pluie, vent: vent, soleil: soleil, code: code };
+  }
+  // Un jour de météo : { date, tmax, tmin, pluie, vent, soleil, code, score, factice, prevision } ou null
+  function jourMeteo(iso) {
+    var r = METEO && METEO.jours && METEO.jours[iso];
+    var passe = iso < AUJ_ISO, m;
+    if (MODE === "test" && passe) { m = fausseMeteo(iso); m.factice = true; }
+    else if (r) m = { tmax: r[0], tmin: r[1], pluie: r[2], vent: r[3], soleil: r[4], code: r[5], factice: false };
+    else return { date: iso, tmax: null, tmin: null, pluie: null, vent: null, soleil: null, code: null, score: null, factice: false, prevision: !passe };
+    m.date = iso; m.score = scoreMeteo(m); m.prevision = !passe;
+    return m;
+  }
+  function getWeatherDays(p) {
+    var jours = [], d = new Date(p.dateStart + "T12:00:00"), fin = new Date(p.dateEnd + "T12:00:00");
+    while (d <= fin) { jours.push(jourMeteo(jourIso(d))); d.setDate(d.getDate() + 1); }
+    return reponse({ jours: jours, recupereLe: METEO ? METEO.recupereLe : null, fichier: !!METEO });
+  }
+  function getWeatherForecast(nb) {
+    var jours = [], i;
+    for (i = 0; i < (nb || 16); i++) jours.push(jourMeteo(jourIso(new Date(AUJ.getFullYear(), AUJ.getMonth(), AUJ.getDate() + i))));
+    return reponse({ jours: jours, recupereLe: METEO ? METEO.recupereLe : null, fichier: !!METEO });
+  }
+  // Ventes moyennes (TTC) par tranche de score, sur le passé disponible : pour estimer l'effet d'une prévision
+  function getWeatherImpact() {
+    var par = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], tous = 0, nbTous = 0;
+    Object.keys(COMMANDES.reduce(function (o, c) { o[c.date] = 1; return o; }, {})).forEach(function (iso) {
+      var m = jourMeteo(iso);
+      if (!m || m.score == null) return;
+      var t = totaux(payees({ dateStart: iso, dateEnd: iso })).ttc;
+      if (!t) return;
+      var k = m.score < 40 ? 0 : (m.score < 70 ? 1 : 2);
+      par[k][0] += t; par[k][1]++; tous += t; nbTous++;
+    });
+    return reponse({ tranches: par.map(function (x) { return { moyenne: x[1] ? arrondi(x[0] / x[1]) : null, jours: x[1] }; }), moyenne: nbTous ? arrondi(tous / nbTous) : null });
+  }
+
+  // ======================================================================
   // Exposition
   // ======================================================================
   window.DonneesTest = {
+    getWeatherDays: getWeatherDays, getWeatherForecast: getWeatherForecast, getWeatherImpact: getWeatherImpact,
+    scoreMeteo: scoreMeteo, METEO_POIDS: METEO_POIDS, meteoFichier: !!METEO,
     AUJOURDHUI: AUJ_ISO,
     mode: MODE, reelDisponible: !!REEL, recupereLe: REEL ? REEL.recupereLe : null,
     getLocations: function () { return reponse(SITES); },
