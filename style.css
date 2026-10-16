@@ -497,3 +497,23 @@ body { overflow-x: hidden; }
 .cren-nom { width: 200px; }
 .cren-note { font-size: 11px; color: var(--texte-doux); }
 .cren-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- Mode météo ---------- */
+.meteo-bandeau { margin-bottom: 16px; }
+.meteo-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+.meteo-jour { background: var(--carte); border: 1px solid var(--bordure); border-radius: 10px; padding: 10px 12px; text-align: center; font-size: 12px; }
+.meteo-jour .mj-date { color: var(--texte-doux); font-weight: 500; text-transform: capitalize; }
+.meteo-jour .mj-ico { font-size: 26px; line-height: 1.4; }
+.meteo-jour .mj-temp { font-weight: 600; font-size: 14px; }
+.meteo-jour .mj-det { color: var(--texte-doux); margin-top: 2px; }
+.meteo-jour .mj-ca { margin-top: 6px; color: var(--texte-doux); }
+.score { display: inline-block; min-width: 38px; padding: 2px 8px; border-radius: 999px; font-weight: 600; font-size: 12px; color: #fff; }
+.score-bon { background: #1f9d55; }
+.score-moyen { background: #d99a1e; }
+.score-mauvais { background: #d6283f; }
+.score-nd { background: #9a9a9a; }
+.delta-bon { color: var(--vert); }
+.delta-mauvais { color: var(--rouge); }
+.meteo-kpi-sous { font-size: 12px; color: var(--texte-doux); margin-top: 4px; }
+.meteo-ligne { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+.meteo-ligne b { font-weight: 600; }

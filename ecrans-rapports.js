@@ -19,12 +19,15 @@
     section: "rapports", fil: ["Tableau de bord"],
     filtres: ["periode", function (ctx) {
       var et = ctx.etat;
-      return A.liste("comparer", "Comparer à", [["prec", "Période précédente"]], et.comparer, function (v) { et.comparer = v; ctx.rafraichir(); });
+      return A.liste("comparer", "Comparer à", [["prec", "Période précédente"], ["n1", "Même période N-1"]], et.comparer, function (v) { et.comparer = v; ctx.rafraichir(); });
     }, "sites"],
     rendre: function (ctx, zone) {
-      var et = ctx.etat, prev = A.decalerPeriode(P(ctx), -1);
-      Promise.all([D.getReportTotalSales(P(ctx)), D.getReportProductsAndCategories(P(ctx)), D.getReportClerkShifts(P(ctx)), et.comparer ? D.getReportTotalSales(prev) : Promise.resolve(null)]).then(function (res) {
+      var et = ctx.etat, prev = et.comparer === "n1" ? A.memePeriodeN1(P(ctx)) : A.decalerPeriode(P(ctx), -1);
+      var nomComp = et.comparer === "n1" ? "Même période N-1" : "Période précédente", meteo = A.meteoActif();
+      Promise.all([D.getReportTotalSales(P(ctx)), D.getReportProductsAndCategories(P(ctx)), D.getReportClerkShifts(P(ctx)), et.comparer ? D.getReportTotalSales(prev) : Promise.resolve(null),
+        meteo ? D.getWeatherDays(P(ctx)) : null, meteo && et.comparer ? D.getWeatherDays(prev) : null, meteo ? A.meteo.carteBandeau() : null]).then(function (res) {
         var ventes = res[0], pc = res[1], emp = res[2], comp = res[3];
+        var meteoHtml = meteo ? A.meteo.carte(P(ctx), res[4].jours, res[5] ? res[5].jours : null, nomComp) + res[6] : "";
         var mode = et.mode || "ttc", vue = et.vue || "courbe", auj = A.aujourdhui();
         var jours = ventes.reportFromPeriod;
         function serie(liste, futur) {
@@ -32,14 +35,14 @@
         }
         var labels = jours.map(function (j) { return +j.date.slice(8); });
         var series = [{ nom: A.libellePeriode(ctx.periode), couleur: "#111", valeurs: serie(jours, true) }];
-        if (comp) series.push({ nom: "Période précédente", couleur: "#999", tirets: true, valeurs: serie(comp.reportFromPeriod.slice(0, jours.length), false) });
+        if (comp) series.push({ nom: nomComp, couleur: "#999", tirets: true, valeurs: serie(comp.reportFromPeriod.slice(0, jours.length), false) });
         var graphe = vue === "courbe" ? A.graph.courbe({ labels: labels, series: series, hauteur: 300 })
           : A.graph.barres({ labels: labels, valeurs: series[0].valeurs.map(function (v) { return v || 0; }), hauteur: 300, couleur: "#222" });
         var droite = A.segment("dash-mode", [["ttc", "TTC"], ["ht", "HT"]], mode, function (v) { et.mode = v; ctx.rafraichir(); }) +
           A.segment("dash-vue", [["courbe", "∼"], ["barres", "▮▮"]], vue, function (v) { et.vue = v; ctx.rafraichir(); });
         function top(titre, entetes, rangees) { return A.carte(titre, A.table(entetes, rangees, null, { classe: "zebre" })); }
         zone.innerHTML = A.kpis([["Nombre de couverts", A.entier(ventes.guestsNumber)], ["Couverts moyen", A.euro(ventes.averageGuest)], ["Total TTC", A.euro(ventes.totalSales)], ["Total HT", A.euro(ventes.totalSalesWithoutTaxes)]]) +
-          A.carte("Total des ventes", graphe + '<div class="legende"><span><i class="trait" style="background:#111"></i>' + E(A.libellePeriode(ctx.periode)) + '</span>' + (comp ? '<span><i class="trait" style="background:#999"></i>Période précédente</span>' : "") + '<span class="chip">' + ventes.closedTillsCount + " caisses clôturées</span></div>", { droite: droite }) +
+          A.carte("Total des ventes", graphe + '<div class="legende"><span><i class="trait" style="background:#111"></i>' + E(A.libellePeriode(ctx.periode)) + '</span>' + (comp ? '<span><i class="trait" style="background:#999"></i>' + E(nomComp) + "</span>" : "") + '<span class="chip">' + ventes.closedTillsCount + " caisses clôturées</span></div>", { droite: droite }) + meteoHtml +
           '<div class="deux-col">' +
           top("Top produits", [{ t: "Produit" }, d("Quantité"), d("Total")], pc.products.slice(0, 5).map(function (p) { return [E(p.name), A.entier(p.productQuantity), A.euro(p.productSales)]; })) +
           top("Top catégories", [{ t: "Catégorie" }, d("Quantité"), d("Total")], pc.categories.slice(0, 5).map(function (p) { return [E(p.category), A.entier(p.productQuantity), A.euro(p.productSales)]; })) + "</div>" +
