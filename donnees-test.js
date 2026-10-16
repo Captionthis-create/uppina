@@ -659,7 +659,37 @@
     return reponse({ categorySales: liste, timed: temps, ordreCategories: liste.map(function (c) { return c.name; }) });
   }
 
+  // ---------- Créneaux de service (2 ou 3, horaires libres, mémorisés dans le navigateur) ----------
+  var CRENEAUX_DEFAUT = [
+    { nom: "Service du midi", debut: "11:00", fin: "15:00" },
+    { nom: "Limonade", debut: "15:00", fin: "18:00" },
+    { nom: "Service du soir", debut: "18:00", fin: "24:00" }
+  ];
+  function enMinutes(hhmm) { var s = String(hhmm || "").split(":"); return (+s[0]) * 60 + (+s[1] || 0); }
+  function getCreneaux() {
+    try {
+      var l = JSON.parse(localStorage.getItem("creneaux-copie") || "null");
+      if (l && l.length >= 2 && l.length <= 3) return l;
+    } catch (e) { /* stockage indisponible ou illisible : valeurs par défaut */ }
+    return CRENEAUX_DEFAUT.map(function (c) { return { nom: c.nom, debut: c.debut, fin: c.fin }; });
+  }
+  function setCreneaux(liste) {
+    try { if (liste) localStorage.setItem("creneaux-copie", JSON.stringify(liste)); else localStorage.removeItem("creneaux-copie"); return true; }
+    catch (e) { return false; }
+  }
+  // Indice du créneau contenant une minute de la journée, ou -1
+  function indexCreneau(liste, min) {
+    for (var i = 0; i < liste.length; i++) {
+      var d = enMinutes(liste[i].debut), f = enMinutes(liste[i].fin);
+      if (f <= d) f += 1440;
+      if (min >= d && min < f) return i;
+    }
+    return -1;
+  }
+
   function getSalesDistribution(p) {
+    var cren = getCreneaux(), parCreneau = cren.map(function (c) { return { slot: c.nom, horaire: c.debut + " – " + c.fin, valeurs: {}, quantites: {} }; });
+    var horsCreneau = { slot: "Hors créneau", horaire: "", valeurs: {}, quantites: {}, vide: true };
     var jours = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
     var cats = nomsCats(), parJour = [], i;
     for (i = 0; i < 7; i++) { parJour.push({ day: jours[i], valeurs: {}, quantites: {}, sessions: {} }); }
@@ -675,10 +705,15 @@
       var tr = tranches[h] = tranches[h] || { slot: deux(h) + ":00", valeurs: {}, quantites: {} };
       tr.valeurs[l.prod.categorie] = (tr.valeurs[l.prod.categorie] || 0) + l.ttc;
       tr.quantites[l.prod.categorie] = (tr.quantites[l.prod.categorie] || 0) + l.q;
+      var ic = indexCreneau(cren, l.cmd.min), cr = ic < 0 ? horsCreneau : parCreneau[ic];
+      cr.valeurs[l.prod.categorie] = (cr.valeurs[l.prod.categorie] || 0) + l.ttc;
+      cr.quantites[l.prod.categorie] = (cr.quantites[l.prod.categorie] || 0) + l.q;
+      if (ic < 0) horsCreneau.vide = false;
     });
+    if (!horsCreneau.vide) parCreneau.push(horsCreneau);
     parJour.forEach(function (o) { o.nbSessions = Object.keys(o.sessions).length; delete o.sessions; });
     return reponse({
-      categories: cats, couleurs: CATEGORIES.map(function (c) { return c.couleur; }), parJour: parJour,
+      parCreneau: parCreneau, categories: cats, couleurs: CATEGORIES.map(function (c) { return c.couleur; }), parJour: parJour,
       parTranche: Object.keys(tranches).sort(function (a, b) { return a - b; }).map(function (h) { return tranches[h]; }),
       heatmap: Object.keys(heat).map(function (k) { var s = k.split("-"); return { jour: +s[0], heure: +s[1], valeur: arrondi(heat[k]) }; })
     });
@@ -976,7 +1011,7 @@
     getReportProductData: getReportProductData, getReportModifiers: getReportModifiers, getEmployees: getEmployees,
     getReportCancelation: getReportCancelation, getReportLosses: getReportLosses, getReportDiscount: getReportDiscount,
     getReportTaxes: getReportTaxes, getReportPaymentMode: getReportPaymentMode, getReportCategories: getReportCategories,
-    getSalesDistribution: getSalesDistribution, getReportMenuSales: getReportMenuSales, getNewHistoryZTill: getNewHistoryZTill,
+    getSalesDistribution: getSalesDistribution, getCreneaux: getCreneaux, setCreneaux: setCreneaux, creneauxDefaut: CRENEAUX_DEFAUT, getReportMenuSales: getReportMenuSales, getNewHistoryZTill: getNewHistoryZTill,
     getReportById: getReportById, getFiscalArchives: getFiscalArchives, getRoomsReport: getRoomsReport,
     getCatalogue: getCatalogue, getAllModifierGroups: getAllModifierGroups, getAllMeals: getAllMeals, getEmployeesPos: getEmployeesPos,
     getRooms: getRooms, getPrintersList: getPrintersList, getAllPreparationStations: getAllPreparationStations,
