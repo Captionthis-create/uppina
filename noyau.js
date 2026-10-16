@@ -612,7 +612,7 @@
       '<button class="choix" data-val="1">' + E(App.siteNom || "") + "</button></div></div>";
   }
   App.actGlobal.sites = function () { /* un seul site de test : même résultat */ };
-  App.actGlobal.groupe = function (g) { groupesOuverts[g] = !groupesOuverts[g]; App.afficher(); };
+  App.actGlobal.groupe = function (g) { groupesOuverts[g] = !groupesOuverts[g]; App.garderMenuLat = true; App.afficher(); };
 
   // Écrans sans source dans l'API officielle : masqués en mode « Réelles » (voir API-officielle.md)
   var HORS_API = ["/reports/stocks", "/reports/sales-report/fiscal", "/point-of-sale/meals", "/point-of-sale/settings/printers", "/point-of-sale/settings/prepa-stations",
@@ -653,7 +653,16 @@
 
     var corps = '<section class="contenu"><div class="contenu-centre ' + (cfg.large ? "large" : "") + '">' + bandeau + '<div id="zone-ecran"></div></div></section>';
     document.getElementById("page").innerHTML =
-      '<div class="mise-en-page' + (cfg.section ? "" : " sans-barre") + '">' + (cfg.section ? barreLaterale(cfg.section, chemin, ctx.periode) : "") + corps + "</div>";
+      '<div class="mise-en-page' + (cfg.section ? "" : " sans-barre") + '">' +
+      (cfg.section ? '<button class="bouton bouton-menu-lat" data-act="menu-lat">☰ Menu ' + E(SECTIONS[cfg.section].titre) + "</button>" + barreLaterale(cfg.section, chemin, ctx.periode) : "") + corps + "</div>";
+    // Téléphone : la barre latérale devient un menu repliable (fermé par défaut)
+    App.act["menu-lat"] = function () {
+      var b = document.querySelector(".barre-laterale");
+      if (b) b.classList.toggle("ouverte");
+    };
+    var bl = document.querySelector(".barre-laterale");
+    if (bl && App.garderMenuLat) bl.classList.add("ouverte");
+    App.garderMenuLat = false;
 
     // Actions de la période
     App.act["periode-prec"] = function () { App.allerA(chemin, App.decalerPeriode(ctx.periode, -1)); };

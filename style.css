@@ -403,3 +403,81 @@ tr.ouvert .chev-dep svg { transform: rotate(180deg); }
 .module-off { text-align: center; padding: 130px 20px; }
 .module-off h1 { font-size: 19px; margin-bottom: 14px; }
 .module-off p { max-width: 420px; margin: 0 auto 20px; line-height: 1.5; }
+
+/* ---- Adaptation tablette / téléphone ---- */
+.bouton-menu-lat { display: none; }
+body { overflow-x: hidden; }
+@media (max-width: 1100px) {
+  .barre-laterale { width: 220px; }
+  .kpis { grid-template-columns: repeat(min(var(--n), 3), 1fr); }
+  .trois-col { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 800px) {
+  .entete { height: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 10px 12px 0; gap: 6px; }
+  .logo, .entete-liens, .onglets { position: static; }
+  .entete-liens { gap: 10px; }
+  #lien-news, #lien-aide { display: none; }
+  .onglets { order: 3; width: 100%; justify-content: flex-start; overflow-x: auto; margin: 0 -12px; padding: 0 12px; width: calc(100% + 24px); white-space: nowrap; }
+  .onglets a { padding: 10px 12px; flex: none; }
+  .menu-compte { max-width: calc(100vw - 24px); }
+
+  .mise-en-page, .mise-en-page.sans-barre { display: block; margin: 12px 10px 30px; }
+  .contenu, .sans-barre .contenu { margin-left: 0; display: block; }
+  .bouton-menu-lat { display: flex; width: 100%; justify-content: flex-start; margin-bottom: 10px; height: 38px; }
+  .barre-laterale { display: none; width: 100%; margin-bottom: 12px; }
+  .barre-laterale.ouverte { display: block; }
+
+  .bandeau-haut { height: auto !important; min-height: 44px; flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .actions { flex-wrap: wrap; }
+  .filtres { padding: 10px; }
+  .filtres-droite { margin-left: 0; }
+  .selecteur-periode { width: 100%; }
+  .selecteur-periode .libelle, .selecteur-periode.inactif .libelle { flex: 1; min-width: 0; }
+  .menu-flottant { max-width: calc(100vw - 30px); }
+  .champ-recherche input { width: 100%; min-width: 0; }
+  .champ-recherche { flex: 1; }
+
+  .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi-v { font-size: 20px; }
+  .deux-col, .trois-col { grid-template-columns: 1fr; gap: 0; }
+  .grille-cartes { grid-template-columns: 1fr 1fr; }
+  .carte h2 { font-size: 17px; }
+  .carte-tete { flex-wrap: wrap; padding: 14px 12px 10px; }
+  .carte.grande-carte .carte-tete { padding: 16px 14px 12px; }
+  .carte.grande-carte .carte-corps, .carte-corps.pad { padding: 12px 14px; }
+  .carte.plein .carte-tete { height: auto; padding-bottom: 8px; }
+
+  /* Tableaux : défilement horizontal plutôt que colonnes écrasées */
+  .carte-corps, .carte { overflow-x: auto; }
+  table { min-width: 520px; }
+  th { padding-right: 12px; }
+  .td-pied { flex-wrap: wrap; }
+
+  .commande { height: auto; min-height: 56px; padding: 8px 10px; flex-wrap: wrap; font-size: 13px; }
+  .tiroir { width: 100%; }
+  .tiroir-tete, .tiroir-corps, .tiroir-pied { padding-left: 14px; padding-right: 14px; }
+
+  .campagne { flex-direction: column; gap: 14px; padding: 16px; }
+  .illustration { width: 120px; }
+  .article { padding: 18px 14px; }
+  .pied-formulaire { flex-direction: column; gap: 12px; }
+  .reglage { gap: 12px; }
+  .reglage select { min-width: 0; }
+  .champ-ligne { flex-direction: column; align-items: stretch; gap: 4px; }
+  .champ-ligne label { width: auto; }
+  .lay-editeur { flex-direction: column; }
+  .lay-cats, .lay-soustitres, .lay-props { width: 100%; }
+  .lay-cats, .lay-soustitres { flex-direction: row; overflow-x: auto; }
+  .lay-sous { min-width: 90px; }
+  .lay-props { border-left: 0; border-top: 1px solid var(--bordure); }
+  .ligne-carte.imprimante, .appareil, .agence, .ligne-action { flex-wrap: wrap; }
+  .aide-cellules { grid-template-columns: 1fr; }
+  .etat-vide.haut, .module-off { padding: 60px 16px; }
+}
+@media (max-width: 480px) {
+  .grille-cartes { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: 1fr; }
+  .logo { font-size: 17px; }
+  .bouton-site #nom-site { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge-mode { font-size: 9px; padding: 3px 5px; }
+}
