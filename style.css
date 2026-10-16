@@ -481,3 +481,12 @@ body { overflow-x: hidden; }
   .bouton-site #nom-site { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge-mode { font-size: 9px; padding: 3px 5px; }
 }
+
+/* Créneaux de service (éditeur) */
+.cren-edit { background: var(--ligne-total); border: 1px solid var(--bordure); border-radius: 8px; padding: 14px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; }
+.cren-ligne { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12px; }
+.cren-ligne label { display: inline-flex; align-items: center; gap: 6px; color: var(--texte-doux); }
+.cren-ligne input { height: 32px; padding: 0 10px; font-size: 12px; background: var(--champ); color: var(--texte); border: 1px solid var(--bordure); border-radius: 8px; font-family: inherit; }
+.cren-nom { width: 200px; }
+.cren-note { font-size: 11px; color: var(--texte-doux); }
+.cren-actions { display: flex; gap: 8px; flex-wrap: wrap; }
