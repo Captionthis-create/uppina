@@ -517,3 +517,34 @@ body { overflow-x: hidden; }
 .meteo-kpi-sous { font-size: 12px; color: var(--texte-doux); margin-top: 4px; }
 .meteo-ligne { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
 .meteo-ligne b { font-weight: 600; }
+
+/* ---- Formulaire produit et prix d'achat ---- */
+.pf { padding: 0; max-width: 900px; margin: 0 auto; }
+.pf-titre { font-size: 18px; margin: 0; padding: 22px 28px; border-bottom: 1px solid var(--bordure); }
+.pf-onglets { display: flex; gap: 6px; padding: 16px 28px; border-bottom: 1px solid var(--bordure); }
+.pf-onglets button { border: 0; background: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; color: var(--texte-doux); }
+.pf-onglets button.actif { background: #222; color: #fff; }
+.pf-corps { padding: 22px 28px 8px; display: flex; flex-direction: column; gap: 16px; }
+.pf-ligne { display: grid; grid-template-columns: 200px 1fr; gap: 16px; align-items: start; font-size: 12px; }
+.pf-lib { font-weight: 600; padding-top: 8px; }
+.pf-champ { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pf-in { width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--champ); color: var(--texte); font: inherit; font-size: 13px; }
+.pf-prix { display: flex; align-items: center; gap: 8px; }
+.pf-prix .pf-in { flex: 1; }
+.pf-prix .pf-tva { flex: 0 0 130px; width: 130px; }
+.pf-unite { color: var(--texte-doux); white-space: nowrap; }
+.pf-puces { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
+.pf-puce { border: 1px solid var(--bordure); background: var(--carte); color: var(--texte); border-radius: 8px; padding: 5px 12px; cursor: pointer; font: inherit; font-size: 12px; }
+.pf-puce.actif { background: #222; color: #fff; border-color: #222; }
+.pf-marge { font-size: 12px; color: #1d7a46; font-weight: 500; }
+.pf-marge.neg { color: #c0392b; }
+.pf-erreur { color: #c0392b; font-size: 12px; padding: 4px 28px 0; min-height: 16px; }
+.pf-pied { display: flex; gap: 12px; padding: 18px 28px 26px; }
+.pf-pied .bouton { flex: 1; justify-content: center; height: 38px; }
+.marge-pos { color: #1d7a46; font-weight: 500; }
+.marge-neg { color: #c0392b; font-weight: 500; }
+.bouton.bascule .interrupteur { display: inline-block; width: 24px; height: 14px; border-radius: 8px; background: #b9b9b9; position: relative; margin-right: 6px; vertical-align: -2px; }
+.bouton.bascule .interrupteur::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: #fff; transition: left .15s; }
+.bouton.bascule.actif .interrupteur { background: #1d7a46; }
+.bouton.bascule.actif .interrupteur::after { left: 12px; }
+@media (max-width: 700px) { .pf-ligne { grid-template-columns: 1fr; gap: 4px; } .pf-lib { padding-top: 0; } }

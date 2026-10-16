@@ -19,17 +19,30 @@
   function onOff(v) { return v ? '<span class="on">On</span>' : '<span class="off">Off</span>'; }
 
   // ---------- Produits ----------
-  A.ecran(PDV + "products-list", {
+  var CHEMIN_PRODUITS = PDV + "products-list";
+  function pct(n) { return n === null || n === undefined ? "-" : String(Math.round(n * 10) / 10).replace(".", ",") + " %"; }
+  // Texte du résumé de marge (formulaire et liste)
+  function texteMarge(m) {
+    if (!m) return "Saisir un prix d'achat pour calculer la marge.";
+    return "Marge " + A.euro(m.marge) + " HT · taux de marque " + pct(m.taux) + (m.coef ? " · coefficient " + String(Math.round(m.coef * 100) / 100).replace(".", ",") : "");
+  }
+
+  A.ecran(CHEMIN_PRODUITS, {
     section: "pdv", fil: fil("Products-list"), filtres: [],
-    actions: function () { return exportCsv() + creer("Ajouter un produit"); },
+    actions: function () { A.act.creer = function () { A.allerA(CHEMIN_PRODUITS + "/create"); }; return exportCsv() + A.bouton("Ajouter un produit", "creer", { classe: "sombre" }); },
     rendre: function (ctx, zone) {
       var et = ctx.etat;
-      D.getCatalogue().then(function (c) {
+      Promise.all([D.getCatalogue(), D.getGestionAchat()]).then(function (r) {
+        var c = r[0], achat = r[1];
+        A.act["achat-bascule"] = function () { D.setGestionAchat(!achat).then(function () { ctx.rafraichir(); }); };
         var lignes = c.produits.filter(function (p) {
           return (!et.cat || p.categorie === et.cat) && (!et.sous || p.sousCategorie === et.sous) && (!et.pole || p.poles.indexOf(et.pole) >= 0) && (!et.tva || ("TVA " + p.tva) === et.tva);
         });
         A.act.export = function () {
-          A.telechargerCsv("produits.csv", ["Nom", "Catégorie", "Sous-catégorie", "Prix", "TVA"], lignes.map(function (p) { return [p.nom, p.categorie, p.sousCategorie, A.montantCsv(p.prix), p.tva]; }));
+          A.telechargerCsv("produits.csv", ["Nom", "Catégorie", "Sous-catégorie", "Prix", "TVA"].concat(achat ? ["Prix d'achat HT", "Marge HT", "Taux de marque"] : []), lignes.map(function (p) {
+            var m = D.calculMarge(p.prix, p.tva, p.achat);
+            return [p.nom, p.categorie, p.sousCategorie, A.montantCsv(p.prix), p.tva].concat(achat ? [p.achat === null ? "" : A.montantCsv(p.achat), m ? A.montantCsv(m.marge) : "", m ? pct(m.taux) : ""] : []);
+          }));
         };
         var sous = [];
         c.categories.forEach(function (x) { if (!et.cat || x.nom === et.cat) x.sous.forEach(function (s) { sous.push([s, s]); }); });
@@ -46,11 +59,120 @@
             { t: "Pôles de préparation", f: function (p) { return p.poles.map(function (x) { return '<span class="puce">' + E(x) + "</span>"; }).join(" "); } },
             { t: "Prix", a: "d", f: function (p) { return A.euro(p.prix); }, tri: function (p) { return p.prix; } },
             { t: "TVA", f: function (p) { return "TVA " + String(p.tva).replace(".", ",") + "% (" + A.decimal(p.tva).replace(".", ",") + " %)"; } },
-            { t: "Type de Prix", a: "d", f: function (p) { return p.nbPrix + " Prix"; } }],
-          lignes: lignes, rech: { ph: "Rechercher un article", texte: function (p) { return p.nom; } }, filtres: filtres, pageSize: 20
+            { t: "Type de Prix", a: "d", f: function (p) { return p.nbPrix + " Prix"; } }]
+            .concat(!achat ? [] : [
+              { t: "Prix d'achat HT", a: "d", f: function (p) { return p.achat === null ? '<span class="doux">-</span>' : A.euro(p.achat); }, tri: function (p) { return p.achat === null ? -1 : p.achat; } },
+              { t: "Marge HT", a: "d", f: function (p) { var m = D.calculMarge(p.prix, p.tva, p.achat); return m ? '<span class="' + (m.marge < 0 ? "marge-neg" : "marge-pos") + '">' + A.euro(m.marge) + "</span>" : "-"; },
+                tri: function (p) { var m = D.calculMarge(p.prix, p.tva, p.achat); return m ? m.marge : -1e9; } },
+              { t: "Taux de marque", a: "d", f: function (p) { var m = D.calculMarge(p.prix, p.tva, p.achat); return m ? pct(m.taux) : "-"; },
+                tri: function (p) { var m = D.calculMarge(p.prix, p.tva, p.achat); return m && m.taux !== null ? m.taux : -1e9; } }]),
+          lignes: lignes, rech: { ph: "Rechercher un article", texte: function (p) { return p.nom; } }, filtres: filtres, pageSize: 20,
+          onLigne: function (p) { A.allerA(CHEMIN_PRODUITS + "/edit/" + encodeURIComponent(p.id)); },
+          droite: '<button class="bouton bascule' + (achat ? " actif" : "") + '" data-act="achat-bascule" title="Active la saisie du prix d\'achat et le calcul de marge"><i class="interrupteur"></i> Prix d\'achat</button>'
         });
       });
     }
+  });
+
+  // ---------- Formulaire produit (création et modification) ----------
+  var ONGLETS_PRODUIT = [["gen", "Générales"], ["tarifs", "Tarifs"], ["refs", "Références"], ["lib", "Libellés"]];
+  var NIVEAUX = ["Aucun", "Direct", "1", "2", "3"];
+  var TYPES_PRIX = [["unitaire", "Prix unitaire"], ["poids", "Prix au poids"], ["libre", "Prix libre"]];
+  var TAUX_TVA = [0, 5.5, 10, 20];
+
+  function formulaireProduit(ctx, zone, id) {
+    Promise.all([D.getCatalogue(), D.getAllModifierGroups(), D.getGestionAchat(), id ? D.getProduct(id) : Promise.resolve(null)]).then(function (r) {
+      var cat = r[0], groupes = r[1], achat = r[2], p = r[3];
+      var f = p ? JSON.parse(JSON.stringify(p)) : { nom: "", categorie: "", sousCategorie: "", poles: [], niveau: "Aucun", options: [], typePrix: "unitaire", prix: 0, tva: 10, achat: null, codeBarre: "", sku: "", plu: "", nomBouton: "", nomPrepa: "" };
+      var onglet = ctx.etat.onglet || "gen", erreur = "";
+      // Les champs numériques sont gardés en texte pour ne pas perdre la saisie en cours
+      var prixTxt = p ? p.prix.toFixed(2).replace(".", ",") : "", achatTxt = p && p.achat !== null ? String(p.achat).replace(".", ",") : "";
+      function nombre(t) { var n = parseFloat(String(t).replace(",", ".")); return String(t).trim() === "" || !isFinite(n) ? null : n; }
+      function ligne(libelle, contenu) { return '<div class="pf-ligne"><div class="pf-lib">' + libelle + '</div><div class="pf-champ">' + contenu + "</div></div>"; }
+      function puces(liste, choisis, cle) {
+        if (!liste.length) return '<span class="doux">Aucun élément disponible</span>';
+        return '<div class="pf-puces">' + liste.map(function (x) {
+          return '<button type="button" class="pf-puce' + (choisis.indexOf(x) >= 0 ? " actif" : "") + '" data-puce="' + cle + '" data-val="' + E(x) + '">' + E(x) + "</button>";
+        }).join("") + "</div>";
+      }
+      function sousCats() {
+        var c = cat.categories.filter(function (x) { return x.nom === f.categorie; })[0];
+        return c ? c.sous : [];
+      }
+      function options(liste, valeur) {
+        return liste.map(function (x) { return '<option value="' + E(x[0]) + '"' + (String(x[0]) === String(valeur) ? " selected" : "") + ">" + E(x[1]) + "</option>"; }).join("");
+      }
+      function blocMarge() {
+        var m = D.calculMarge(nombre(prixTxt) || 0, f.tva, nombre(achatTxt));
+        return '<span class="pf-marge' + (m && m.marge < 0 ? " neg" : "") + '" id="pf-marge">' + E(texteMarge(m)) + "</span>";
+      }
+      function contenu() {
+        if (onglet === "tarifs") return '<button type="button" class="bouton" data-nondispo>' + A.icones.plus + " Ajouter un prix</button>";
+        if (onglet === "refs") return ligne("Code-barre",'<input class="pf-in" data-k="codeBarre" value="' + E(f.codeBarre) + '">') + ligne("SKU", '<input class="pf-in" data-k="sku" value="' + E(f.sku) + '">') + ligne("PLU", '<input class="pf-in" data-k="plu" value="' + E(f.plu) + '">');
+        if (onglet === "lib") return ligne("Nom du bouton", '<input class="pf-in" data-k="nomBouton" placeholder="Insérez le nom du bouton sur la caisse" value="' + E(f.nomBouton) + '">') + ligne("Nom de préparation", '<input class="pf-in" data-k="nomPrepa" value="' + E(f.nomPrepa) + '">');
+        var tvaListe = TAUX_TVA.indexOf(+f.tva) >= 0 ? TAUX_TVA : TAUX_TVA.concat([+f.tva]);
+        return ligne("Nom*", '<input class="pf-in" data-k="nom" value="' + E(f.nom) + '">') +
+          ligne("Catégorie*", '<select class="pf-in" data-k="categorie"><option value="">Sélectionnez une catégorie</option>' + options(cat.categories.map(function (x) { return [x.nom, x.nom]; }), f.categorie) + "</select>") +
+          ligne("Sous-catégorie", '<select class="pf-in" data-k="sousCategorie"><option value="">Aucune</option>' + options(sousCats().map(function (x) { return [x, x]; }), f.sousCategorie) + "</select>") +
+          ligne("Pôle", puces(cat.poles, f.poles, "poles")) +
+          ligne("Niveau de suite", '<div class="pf-puces">' + NIVEAUX.map(function (n) { return '<button type="button" class="pf-puce' + (n === f.niveau ? " actif" : "") + '" data-niveau="' + n + '">' + n + "</button>"; }).join("") + "</div>") +
+          ligne("Options", puces(groupes.map(function (g) { return g.nom; }), f.options, "options")) +
+          ligne("Prix", '<div class="segment">' + TYPES_PRIX.map(function (t) { return '<button type="button" class="' + (t[0] === f.typePrix ? "actif" : "") + '" data-typeprix="' + t[0] + '">' + t[1] + "</button>"; }).join("") + "</div>") +
+          ligne("Normal*", '<div class="pf-prix"><input class="pf-in" data-k="prix" inputmode="decimal" placeholder="0,00" value="' + E(prixTxt) + '"><span class="pf-unite">€ TTC</span><select class="pf-in pf-tva" data-k="tva">' +
+            options(tvaListe.map(function (t) { return [t, "TVA " + String(t).replace(".", ",") + "%"]; }), f.tva) + "</select></div>") +
+          (achat ? ligne("Prix d'achat", '<div class="pf-prix"><input class="pf-in" data-k="achat" inputmode="decimal" placeholder="0,00" value="' + E(achatTxt) + '"><span class="pf-unite">€ HT</span></div>' + blocMarge()) : "");
+      }
+      function dessiner() {
+        zone.innerHTML = '<div class="carte pf"><h2 class="pf-titre">' + (p ? "Modifier un produit" : "Créer un produit") + "</h2>" +
+          '<div class="pf-onglets">' + ONGLETS_PRODUIT.map(function (o) { return '<button type="button" class="' + (o[0] === onglet ? "actif" : "") + '" data-onglet="' + o[0] + '">' + o[1] + "</button>"; }).join("") + "</div>" +
+          '<div class="pf-corps">' + contenu() + "</div>" +
+          '<div class="pf-erreur" id="pf-erreur">' + E(erreur) + "</div>" +
+          '<div class="pf-pied"><button type="button" class="bouton" data-annuler>Annuler</button>' +
+          (p && (p.ajoute || p.modifie) ? '<button type="button" class="bouton rouge" data-reset>' + (p.ajoute ? "Supprimer" : "Rétablir l'original") + "</button>" : "") +
+          '<button type="button" class="bouton sombre" data-sauver>Sauvegarder</button></div></div>';
+      }
+      function basculer(liste, v) { var i = liste.indexOf(v); if (i >= 0) liste.splice(i, 1); else liste.push(v); }
+      zone.onclick = function (e) {
+        var t = e.target.closest("[data-onglet],[data-puce],[data-niveau],[data-typeprix],[data-annuler],[data-sauver],[data-reset],[data-nondispo]");
+        if (!t) return;
+        if (t.hasAttribute("data-onglet")) { onglet = ctx.etat.onglet = t.getAttribute("data-onglet"); dessiner(); }
+        else if (t.hasAttribute("data-puce")) { basculer(f[t.getAttribute("data-puce")], t.getAttribute("data-val")); dessiner(); }
+        else if (t.hasAttribute("data-niveau")) { f.niveau = t.getAttribute("data-niveau"); dessiner(); }
+        else if (t.hasAttribute("data-typeprix")) { f.typePrix = t.getAttribute("data-typeprix"); dessiner(); }
+        else if (t.hasAttribute("data-nondispo")) A.nonDispo();
+        else if (t.hasAttribute("data-annuler")) { ctx.etat.onglet = "gen"; A.allerA(CHEMIN_PRODUITS); }
+        else if (t.hasAttribute("data-reset")) {
+          D.resetProduct(id).then(function () { A.info(p.ajoute ? "Produit supprimé." : "Produit rétabli."); ctx.etat.onglet = "gen"; A.allerA(CHEMIN_PRODUITS); });
+        } else {
+          var prix = nombre(prixTxt);
+          D.setProduct(id, { nom: f.nom, categorie: f.categorie, sousCategorie: f.sousCategorie, poles: f.poles, niveau: f.niveau, options: f.options, typePrix: f.typePrix,
+            prix: prix === null ? NaN : prix, tva: f.tva, achat: achat ? nombre(achatTxt) : f.achat, codeBarre: f.codeBarre, sku: f.sku, plu: f.plu, nomBouton: f.nomBouton, nomPrepa: f.nomPrepa })
+            .then(function () { A.info(p ? "Produit modifié." : "Produit créé."); ctx.etat.onglet = "gen"; A.allerA(CHEMIN_PRODUITS); },
+              function (msg) { erreur = String(msg); onglet = ctx.etat.onglet = "gen"; dessiner(); });
+        }
+      };
+      // Saisie : on met à jour l'état sans redessiner (sauf catégorie/TVA qui changent d'autres champs)
+      zone.oninput = function (e) {
+        var k = e.target.getAttribute("data-k");
+        if (!k) return;
+        if (k === "prix") prixTxt = e.target.value; else if (k === "achat") achatTxt = e.target.value;
+        else if (k === "tva") f.tva = +e.target.value; else f[k] = e.target.value;
+        if (k === "categorie") { f.sousCategorie = ""; dessiner(); return; }
+        var b = document.getElementById("pf-marge");
+        if (b) { var m = D.calculMarge(nombre(prixTxt) || 0, f.tva, nombre(achatTxt)); b.textContent = texteMarge(m); b.classList.toggle("neg", !!m && m.marge < 0); }
+      };
+      dessiner();
+    }, function (msg) {
+      zone.innerHTML = A.carte("Produit introuvable", '<p class="doux">' + E(String(msg)) + "</p>");
+    });
+  }
+  A.ecran(CHEMIN_PRODUITS + "/create", {
+    section: "pdv", fil: ["Point-of-sale", "Products-list", "Create"], filtres: [],
+    rendre: function (ctx, zone) { formulaireProduit(ctx, zone, null); }
+  });
+  A.ecran(CHEMIN_PRODUITS + "/edit/:id", {
+    section: "pdv", fil: ["Point-of-sale", "Products-list", "Edit"], filtres: [],
+    rendre: function (ctx, zone) { formulaireProduit(ctx, zone, ctx.ids.id); }
   });
 
   // ---------- Mise en page de la caisse ----------

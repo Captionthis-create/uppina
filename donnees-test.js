@@ -851,11 +851,85 @@
   // ======================================================================
   // API : point de vente (catalogue et configuration)
   // ======================================================================
+  // ---- Édition des produits : surcharge locale gardée dans le navigateur (le catalogue d'origine n'est jamais modifié) ----
+  // modifs : id produit existant -> champs modifiés ; ajouts : produits créés ; achat : gestion des prix d'achat activée
+  var CLE_PRODUITS = "produits-copie";
+  var EDITS = null;
+  var CHAMPS_PRODUIT = ["nom", "categorie", "sousCategorie", "poles", "niveau", "options", "typePrix", "prix", "tva", "achat", "codeBarre", "sku", "plu", "nomBouton", "nomPrepa"];
+  function initEdits() {
+    if (EDITS) return;
+    try { EDITS = JSON.parse(localStorage.getItem(CLE_PRODUITS) || "null"); } catch (e) { EDITS = null; }
+    if (!EDITS || typeof EDITS !== "object") EDITS = {};
+    EDITS.modifs = EDITS.modifs || {}; EDITS.ajouts = EDITS.ajouts || []; EDITS.achat = !!EDITS.achat;
+  }
+  function sauverEdits() {
+    try { localStorage.setItem(CLE_PRODUITS, JSON.stringify(EDITS)); return true; } catch (e) { return false; }
+  }
+  function couleurCategorie(nom, defaut) {
+    var c = CATEGORIES.filter(function (x) { return x.nom === nom; })[0];
+    return c ? c.couleur : (defaut || "#888888");
+  }
+  // Produit complet = valeurs d'origine + surcharge
+  function produitComplet(base, ajout) {
+    var m = ajout ? base : (EDITS.modifs[base.id] || {});
+    var o = {
+      id: base.id, nom: base.nom, categorie: base.categorie, sousCategorie: base.sousCategorie, poles: ajout ? [] : poles(base),
+      niveau: "Aucun", options: !ajout && base.groupe ? [base.groupe] : [], typePrix: "unitaire", prix: base.prix, tva: base.tva, achat: null,
+      codeBarre: "", sku: "", plu: "", nomBouton: "", nomPrepa: "", nbPrix: 1, ajoute: !!ajout, modifie: !ajout && !!EDITS.modifs[base.id]
+    };
+    CHAMPS_PRODUIT.forEach(function (k) { if (m[k] !== undefined) o[k] = m[k]; });
+    o.couleur = couleurCategorie(o.categorie, base.couleur);
+    return o;
+  }
+  function tousProduits() {
+    initEdits();
+    return PRODUITS.map(function (p) { return produitComplet(p, false); }).concat(EDITS.ajouts.map(function (a) { return produitComplet(a, true); }));
+  }
+  function getProduct(id) {
+    var p = tousProduits().filter(function (x) { return x.id === id; })[0];
+    return p ? reponse(p) : Promise.reject("Produit introuvable.");
+  }
+  // d = champs saisis ; id null = création. Rejette avec un message si invalide.
+  function setProduct(id, d) {
+    initEdits();
+    var nom = String(d.nom || "").trim(), prix = Math.round(+d.prix * 100) / 100, tva = +d.tva;
+    var achat = d.achat === null || d.achat === "" || d.achat === undefined ? null : Math.round(+d.achat * 10000) / 10000;
+    if (!nom) return Promise.reject("Le nom est obligatoire.");
+    if (!d.categorie) return Promise.reject("Choisir une catégorie.");
+    if (!isFinite(prix) || prix < 0) return Promise.reject("Prix invalide.");
+    if (!isFinite(tva)) return Promise.reject("Choisir la TVA.");
+    if (achat !== null && (!isFinite(achat) || achat < 0)) return Promise.reject("Prix d'achat invalide.");
+    var val = { nom: nom, categorie: d.categorie, sousCategorie: d.sousCategorie || "", poles: d.poles || [], niveau: d.niveau || "Aucun", options: d.options || [],
+      typePrix: d.typePrix || "unitaire", prix: prix, tva: tva, achat: achat, codeBarre: String(d.codeBarre || "").trim(), sku: String(d.sku || "").trim(),
+      plu: String(d.plu || "").trim(), nomBouton: String(d.nomBouton || "").trim(), nomPrepa: String(d.nomPrepa || "").trim() };
+    var ajout = id ? EDITS.ajouts.filter(function (a) { return a.id === id; })[0] : null;
+    if (!id) { val.id = "n" + Date.now(); EDITS.ajouts.push(val); id = val.id; }
+    else if (ajout) { val.id = id; EDITS.ajouts[EDITS.ajouts.indexOf(ajout)] = val; }
+    else if (PRODUITS.some(function (p) { return p.id === id; })) EDITS.modifs[id] = val;
+    else return Promise.reject("Produit introuvable.");
+    if (!sauverEdits()) return Promise.reject("Stockage du navigateur indisponible.");
+    return getProduct(id);
+  }
+  // Supprime un produit créé, ou rétablit un produit d'origine modifié
+  function resetProduct(id) {
+    initEdits();
+    EDITS.ajouts = EDITS.ajouts.filter(function (a) { return a.id !== id; });
+    delete EDITS.modifs[id];
+    sauverEdits();
+    return reponse(true);
+  }
+  function getGestionAchat() { initEdits(); return reponse(EDITS.achat); }
+  function setGestionAchat(actif) { initEdits(); EDITS.achat = !!actif; sauverEdits(); return reponse(EDITS.achat); }
+  // Marge d'un produit : prix TTC, TVA en %, prix d'achat HT. Taux de marque = marge / prix de vente HT ; coefficient = HT / achat.
+  function calculMarge(prix, tva, achat) {
+    if (achat === null || achat === undefined || achat === "" || !isFinite(+achat) || !isFinite(+prix)) return null;
+    var vente = ht(+prix, +tva || 0), marge = vente - +achat;
+    return { ht: vente, marge: marge, taux: vente > 0 ? marge / vente * 100 : null, coef: +achat > 0 ? vente / +achat : null };
+  }
+
   function getCatalogue() {
     return reponse({
-      produits: PRODUITS.map(function (p) {
-        return { id: p.id, nom: p.nom, categorie: p.categorie, sousCategorie: p.sousCategorie, couleur: p.couleur, poles: poles(p), prix: p.prix, tva: p.tva, nbPrix: 1 };
-      }),
+      produits: tousProduits(),
       categories: CATEGORIES.map(function (c) { return { nom: c.nom, couleur: c.couleur, sous: c.sous }; }),
       poles: ["Cuisine", "Bar", "Crêperie", "Dessert"], taxes: TAXES.map(function (t) { return t.name; })
     });
@@ -1121,6 +1195,7 @@
     getReportTaxes: getReportTaxes, getReportPaymentMode: getReportPaymentMode, getReportCategories: getReportCategories,
     getSalesDistribution: getSalesDistribution, getCreneaux: getCreneaux, setCreneaux: setCreneaux, creneauxDefaut: CRENEAUX_DEFAUT, getReportMenuSales: getReportMenuSales, getNewHistoryZTill: getNewHistoryZTill,
     getReportById: getReportById, getFiscalArchives: getFiscalArchives, getRoomsReport: getRoomsReport,
+    getProduct: getProduct, setProduct: setProduct, resetProduct: resetProduct, getGestionAchat: getGestionAchat, setGestionAchat: setGestionAchat, calculMarge: calculMarge,
     getCatalogue: getCatalogue, getAllModifierGroups: getAllModifierGroups, getAllMeals: getAllMeals, getEmployeesPos: getEmployeesPos,
     getRooms: getRooms, getPrintersList: getPrintersList, getAllPreparationStations: getAllPreparationStations,
     getPricingList: getPricingList, getAllTaxes: getAllTaxes, getDiscounts: getDiscounts, getCashMovementReasons: getCashMovementReasons,
