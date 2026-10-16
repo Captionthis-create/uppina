@@ -82,6 +82,7 @@
     oeil: svg('<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>'),
     loupe: svg('<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/>'),
     plus: svg('<path d="M8 3v10M3 8h10"/>'),
+    crayon: svg('<path d="M2.5 13.5l.7-3L11 2.7a1.4 1.4 0 0 1 2 0l.3.3a1.4 1.4 0 0 1 0 2L5.5 12.8z"/><path d="M9.8 3.9l2.3 2.3"/>'),
     filtres: svg('<path d="M2 4.5h12M2 8h12M2 11.5h12"/><circle cx="5" cy="4.5" r="1.5" fill="#fff"/><circle cx="11" cy="8" r="1.5" fill="#fff"/><circle cx="6.5" cy="11.5" r="1.5" fill="#fff"/>'),
     document: '<svg class="icone-vide" viewBox="0 0 32 32"><path d="M8 3h11l6 6v20H8z" fill="#cfcfcf" stroke="none"/><path d="M12 14h10M12 18h10M12 22h7" stroke="#555" stroke-width="2"/></svg>',
     cible: svg('<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2"/>'),

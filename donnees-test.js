@@ -493,8 +493,19 @@
     return reponse({ realTimeData: { totalSales: 0, guestsNumber: 0, orderCount: 0, totalCanceled: 0, totalByHours: [] }, lastWeekData: { totalByHours: [] } });
   }
 
-  function getHybridStock() {
-    var lignes = PRODUITS.filter(function (p) { return p.cat !== 0 && p.cat !== 5 || p.pole === "Bar"; }).slice(0, 30).map(function (p, i) {
+  // ---- Stocks : PARTIE FACTICE (l'API officielle ne fournit aucune donnée de stock) ----
+  // Les stocks et mouvements sont inventés, modifiables (ajout, inventaire, perte) et gardés dans le navigateur.
+  var MOTIFS_PERTE = ["DLC dépassée", "Casse", "Vol", "Autre"];
+  var STOCK = null;       // [{ id, productName, quantity, lastDeclaredAt, category, subCategory }]
+  var MOUVEMENTS = {};    // id produit -> [{ date (ISO complet), type, delta, avant, apres, motif, note }]
+  var CLE_STOCK = "stock-factice";
+  function initStock() {
+    if (STOCK) return;
+    try {
+      var s = JSON.parse(localStorage.getItem(CLE_STOCK) || "null");
+      if (s && s.stock && s.stock.length) { STOCK = s.stock; MOUVEMENTS = s.mouvements || {}; return; }
+    } catch (e) { /* stockage indisponible ou illisible : on régénère */ }
+    STOCK = PRODUITS.filter(function (p) { return p.cat !== 0 && p.cat !== 5 || p.pole === "Bar"; }).slice(0, 30).map(function (p, i) {
       var declare = i % 4 === 0;
       return {
         id: p.id, productName: p.nom, quantity: declare ? entre(2, 24) : 0,
@@ -502,7 +513,31 @@
         category: p.categorie, subCategory: p.sousCategorie
       };
     });
-    return reponse(lignes);
+  }
+  function sauverStock() {
+    try { localStorage.setItem(CLE_STOCK, JSON.stringify({ stock: STOCK, mouvements: MOUVEMENTS })); } catch (e) { /* stockage indisponible */ }
+  }
+  function getHybridStock() { initStock(); return reponse(STOCK); }
+  function getStockMovements(id) { initStock(); return reponse(MOUVEMENTS[id] || []); }
+  // m = { type: "ajout" | "inventaire" | "perte", quantite, motif, note } ; rejette avec un message si invalide
+  function setStockMovement(id, m) {
+    initStock();
+    var l = STOCK.filter(function (x) { return x.id === id; })[0], q = Math.round(+m.quantite * 100) / 100;
+    if (!l) return Promise.reject("Produit introuvable.");
+    if (!isFinite(q) || q < 0 || (m.type !== "inventaire" && q === 0)) return Promise.reject("Quantité invalide.");
+    if (m.type === "perte" && MOTIFS_PERTE.indexOf(m.motif) < 0) return Promise.reject("Choisir le motif de la perte.");
+    if (m.type === "perte" && q > l.quantity) return Promise.reject("La perte dépasse le stock actuel (" + l.quantity + ").");
+    var avant = l.quantity;
+    var apres = m.type === "ajout" ? avant + q : m.type === "perte" ? avant - q : q;
+    apres = Math.round(apres * 100) / 100;
+    l.quantity = apres;
+    if (m.type === "inventaire") l.lastDeclaredAt = jourIso(new Date());
+    (MOUVEMENTS[id] = MOUVEMENTS[id] || []).unshift({
+      date: new Date().toISOString(), type: m.type, delta: Math.round((apres - avant) * 100) / 100, avant: avant, apres: apres,
+      motif: m.type === "perte" ? m.motif : "", note: m.note || ""
+    });
+    sauverStock();
+    return reponse(l);
   }
 
   function getReportProductData(p) {
@@ -1008,6 +1043,7 @@
     getHomePage: getHomePage, getOrders: getOrders, getOrderById: getOrderById,
     getReportTotalSales: getReportTotalSales, getReportProductsAndCategories: getReportProductsAndCategories,
     getReportClerkShifts: getReportClerkShifts, getRealTime: getRealTime, getHybridStock: getHybridStock,
+    getStockMovements: getStockMovements, setStockMovement: setStockMovement, MOTIFS_PERTE: MOTIFS_PERTE,
     getReportProductData: getReportProductData, getReportModifiers: getReportModifiers, getEmployees: getEmployees,
     getReportCancelation: getReportCancelation, getReportLosses: getReportLosses, getReportDiscount: getReportDiscount,
     getReportTaxes: getReportTaxes, getReportPaymentMode: getReportPaymentMode, getReportCategories: getReportCategories,

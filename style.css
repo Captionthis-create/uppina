@@ -288,6 +288,13 @@ tr.ouvert .chev-dep svg { transform: rotate(180deg); }
 .tiroir-corps.tables { display: flex; flex-wrap: wrap; gap: 10px; align-content: flex-start; }
 .table-ronde { width: 56px; height: 56px; border-radius: 50%; background: var(--champ); display: flex; align-items: center; justify-content: center; font-weight: 600; }
 .tiroir-pied { display: flex; align-items: center; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--bordure); }
+.bandeau-factice { padding: 10px 14px; margin-bottom: 14px; border-left: 4px solid #e8a33d; background: rgba(232, 163, 61, .15); border-radius: 4px; font-size: 12px; }
+.stk-type { margin-bottom: 14px; }
+.stk-form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; font-size: 12px; }
+.stk-form label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
+.stk-form input, .stk-form select { height: 32px; padding: 0 8px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--champ); color: var(--texte); font-size: 13px; }
+.stk-erreur { color: var(--rouge); min-height: 16px; }
+.stk-titre { font-size: 13px; font-weight: 600; margin: 8px 0; }
 .bandeau-statut { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-left: 4px solid var(--vert); background: var(--vert-fond); margin-bottom: 18px; font-size: 13px; }
 .bandeau-statut.ko { border-left-color: var(--rouge); background: #fdeaec; }
 .bandeau-statut .rond { width: 20px; height: 20px; border-radius: 50%; background: var(--vert); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }

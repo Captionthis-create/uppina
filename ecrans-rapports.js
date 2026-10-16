@@ -63,6 +63,62 @@
     }
   });
 
+  // ---------- Stocks : tiroir d'édition (ajout / inventaire / perte), données factices ----------
+  var TYPES_STOCK = [["ajout", "Ajouter"], ["inventaire", "Inventaire"], ["perte", "Perte"]];
+  var LIB_MVT = { ajout: "Ajout", inventaire: "Inventaire", perte: "Perte" };
+  function dateHeure(iso) {
+    var x = new Date(iso);
+    function z(n) { return (n < 10 ? "0" : "") + n; }
+    return z(x.getDate()) + "/" + z(x.getMonth() + 1) + "/" + x.getFullYear() + " " + z(x.getHours()) + ":" + z(x.getMinutes());
+  }
+  function editerStock(l, ctx) {
+    var type = "ajout";
+    var t = A.tiroir("");
+    function valeur(id) { var c = document.getElementById(id); return c ? c.value : ""; }
+    function dessiner(mouvements, erreur) {
+      var gardeQ = valeur("stk-q"), gardeMotif = valeur("stk-motif"), gardeNote = valeur("stk-note");
+      var aide = type === "ajout" ? "Quantité reçue à ajouter au stock."
+        : type === "inventaire" ? "Quantité réellement comptée : elle remplace le stock actuel."
+        : "Quantité perdue, retirée du stock.";
+      t.innerHTML = '<div class="tiroir-tete"><div><h3>' + E(l.productName) + '</h3><span class="doux">' + E(l.category) + " › " + E(l.subCategory) + " · stock actuel : <b>" + E(l.quantity) + '</b></span></div><button class="fermer" data-fermer>✕</button></div>' +
+        '<div class="tiroir-corps">' +
+        '<div class="bandeau-factice">Données factices : non fournies par l\'API.</div>' +
+        '<div class="segment stk-type">' + TYPES_STOCK.map(function (c) { return '<button class="' + (c[0] === type ? "actif" : "") + '" data-type="' + c[0] + '">' + c[1] + "</button>"; }).join("") + "</div>" +
+        '<div class="stk-form"><label>' + (type === "inventaire" ? "Quantité comptée" : "Quantité") + '<input id="stk-q" type="number" min="0" step="any" inputmode="decimal"></label><p class="doux">' + aide + "</p>" +
+        (type === "perte" ? '<label>Motif de la perte<select id="stk-motif"><option value="">Choisir un motif…</option>' + D.MOTIFS_PERTE.map(function (m) { return '<option value="' + E(m) + '">' + E(m) + "</option>"; }).join("") + "</select></label>" : "") +
+        '<label>Commentaire (facultatif)<input id="stk-note" type="text" maxlength="120"></label>' +
+        '<div class="stk-erreur">' + E(erreur || "") + "</div></div>" +
+        '<h4 class="stk-titre">Historique des mouvements</h4>' +
+        (mouvements.length ? A.table([{ t: "Date" }, { t: "Type" }, { a: "d", t: "Variation" }, { a: "d", t: "Stock" }, { t: "Motif" }],
+          mouvements.slice(0, 15).map(function (m) {
+            return [dateHeure(m.date), LIB_MVT[m.type], (m.delta > 0 ? "+" : "") + A.entier(m.delta), E(m.avant) + " → " + E(m.apres), E(m.motif + (m.note ? (m.motif ? " · " : "") + m.note : "") || "-")];
+          }), null, { classe: "zebre" }) : '<p class="doux">Aucun mouvement enregistré.</p>') +
+        "</div>" +
+        '<div class="tiroir-pied"><button class="bouton" data-fermer>Annuler</button><span class="td-espace"></span><button class="bouton sombre" data-valider>Enregistrer</button></div>';
+      var q = document.getElementById("stk-q"), mo = document.getElementById("stk-motif");
+      q.value = gardeQ; document.getElementById("stk-note").value = gardeNote;
+      if (mo) mo.value = gardeMotif;
+      q.focus();
+    }
+    function charger(erreur) { D.getStockMovements(l.id).then(function (m) { dessiner(m, erreur); }); }
+    t.addEventListener("click", function (e) {
+      var c = e.target.closest("[data-type],[data-fermer],[data-valider]");
+      if (!c) return;
+      if (c.hasAttribute("data-fermer")) A.fermerTiroir();
+      else if (c.hasAttribute("data-type")) { type = c.getAttribute("data-type"); charger(""); }
+      else {
+        var mot = document.getElementById("stk-motif"), qte = document.getElementById("stk-q").value;
+        D.setStockMovement(l.id, { type: type, quantite: qte === "" ? NaN : qte, motif: mot ? mot.value : "", note: document.getElementById("stk-note").value.trim() })
+          .then(function (nl) {
+            A.fermerTiroir();
+            A.info(LIB_MVT[type] + " enregistré : stock de " + l.productName + " = " + nl.quantity);
+            ctx.rafraichir();
+          }, function (msg) { charger(String(msg)); });
+      }
+    });
+    charger("");
+  }
+
   // ---------- Stocks ----------
   A.ecran("/reports/stocks", {
     section: "rapports", fil: ["Stocks"],
@@ -87,7 +143,12 @@
         var filtres = '<div class="selecteur-periode inactif"><button disabled>‹</button><span class="libelle">Sélectionner une plage de dates</span><button disabled>›</button></div>' +
           A.liste("stk-cat", "Catégorie", Object.keys(cats).map(function (c) { return [c, c]; }), et.cat, function (v) { et.cat = v; et.sous = ""; ctx.rafraichir(); }) +
           A.liste("stk-sous", "Sous-catégorie", Object.keys(sous).map(function (c) { return [c, c]; }), et.sous, function (v) { et.sous = v; ctx.rafraichir(); });
-        zone.innerHTML = A.carte("Tableau des stocks",
+        A.act.stkEdit = function (id) {
+          var l = lignes.filter(function (x) { return String(x.id) === id; })[0];
+          if (l) editerStock(l, ctx);
+        };
+        zone.innerHTML = '<div class="bandeau-factice"><b>Données factices.</b> Les stocks ne sont pas fournis par l\'API Popina : quantités et mouvements sont inventés et ne sont enregistrés que dans ce navigateur.</div>' +
+          A.carte("Tableau des stocks",
           '<div id="td"></div><div class="barre-stock">Stock déclaré <input id="smin" placeholder="" value="' + E(et.min || "") + '"> à <input id="smax" value="' + E(et.max || "") + '"></div>', { classe: "avec-tableau" });
         // La zone « stock déclaré » se place sous la barre d'outils
         var tdz = document.getElementById("td");
@@ -95,7 +156,8 @@
           colonnes: [{ t: "Produit", k: "productName" }, { t: "Dernière déclaration", f: function (r) { return relatif(r.lastDeclaredAt); }, tri: function (r) { return r.lastDeclaredAt || ""; } },
             { t: "Catégorie", f: function (r) { return '<span class="ic-nom">' + A.icones.stocks.replace("icone", "icone sombre") + E(r.category) + "</span>"; }, tri: function (r) { return r.category; } },
             { t: "Sous-catégorie", f: function (r) { return '<span class="ic-nom">' + A.icones.dossier + E(r.subCategory) + "</span>"; }, tri: function (r) { return r.subCategory; } },
-            { t: "Stock déclaré", k: "quantity", tri: function (r) { return r.quantity; } }],
+            { t: "Stock déclaré", k: "quantity", tri: function (r) { return r.quantity; } },
+            { t: "", f: function (r) { return '<button class="bouton-icone" title="Modifier le stock" data-act="stkEdit" data-val="' + E(r.id) + '">' + A.icones.crayon + "</button>"; }, tri: function () { return 0; } }],
           lignes: vue, rech: { ph: "Rechercher un produit", texte: function (r) { return r.productName; } }, sansFiltrer: true, sansColonnes: true, filtres: filtres, pageSize: 20
         });
         var bs = zone.querySelector(".barre-stock");
