@@ -294,6 +294,19 @@ tr.ouvert .chev-dep svg { transform: rotate(180deg); }
 .stk-form label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
 .stk-form input, .stk-form select { height: 32px; padding: 0 8px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--champ); color: var(--texte); font-size: 13px; }
 .stk-erreur { color: var(--rouge); min-height: 16px; }
+.badge-bon { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; white-space: nowrap; background: var(--champ); color: var(--texte-doux); }
+.badge-bon.ok { background: rgba(40, 167, 100, .16); color: var(--vert); }
+.badge-bon.ko { background: rgba(224, 70, 60, .16); color: var(--rouge); }
+.badge-bon.attention { background: rgba(232, 163, 61, .22); color: #b8741a; }
+.bon-apercu { border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; color: #fff; background: linear-gradient(135deg, #3b2a7a, #8e44ad); }
+.bon-ap-montant { font-size: 30px; font-weight: 600; }
+.bon-ap-ligne { font-size: 12px; opacity: .9; margin-top: 2px; }
+.bon-ap-code { font-size: 11px; opacity: .75; margin-top: 10px; letter-spacing: .08em; }
+.bon-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.bon-chip { border: 1px solid var(--bordure); background: var(--champ); color: var(--texte); border-radius: 14px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+.bon-chip:hover { border-color: var(--texte); }
+.bon-ligne { display: flex; gap: 8px; margin-bottom: 14px; }
+.bon-ligne input { flex: 1; height: 32px; padding: 0 8px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--champ); color: var(--texte); font-size: 13px; }
 .stk-titre { font-size: 13px; font-weight: 600; margin: 8px 0; }
 .bandeau-statut { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-left: 4px solid var(--vert); background: var(--vert-fond); margin-bottom: 18px; font-size: 13px; }
 .bandeau-statut.ko { border-left-color: var(--rouge); background: #fdeaec; }

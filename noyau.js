@@ -75,6 +75,7 @@
     cadenas: svg('<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/>'),
     cloche: svg('<path d="M4 11V7a4 4 0 0 1 8 0v4l1 1.5H3zM6.5 14a1.6 1.6 0 0 0 3 0"/>'),
     pin: svg('<path d="M8 14s4-4 4-7a4 4 0 0 0-8 0c0 3 4 7 4 7z"/><circle cx="8" cy="7" r="1.4"/>'),
+    cadeau: svg('<rect x="2" y="6" width="12" height="3" rx="1"/><path d="M3 9v4.5h10V9M8 6v7.5M8 6C6 6 5 5 5 4s1.5-1.5 3 2c1.5-3.5 3-3 3-2s-1 2-3 2"/>'),
     clients: svg('<circle cx="6" cy="5" r="2.2"/><path d="M2 13.5c0-2.5 1.7-4 4-4s4 1.5 4 4M11 4.5h3M11 7.5h3"/>'),
     soleil: svg('<circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>'),
     lune: svg('<path d="M12.5 10A5.5 5.5 0 0 1 6 3.5 5.5 5.5 0 1 0 12.5 10z"/>'),
@@ -545,7 +546,7 @@
         { groupe: "reglages-pdv", label: "Réglages", icone: ICONES.engrenage, items: reglagesPdv }
       ]
     },
-    clients: { titre: "Fiches Clients", items: [{ label: "Liste des clients", route: "/customers", icone: ICONES.clients }] },
+    clients: { titre: "Fiches Clients", items: [{ label: "Liste des clients", route: "/customers", icone: ICONES.clients }, { label: "Bons cadeaux", route: "/customers/vouchers", icone: ICONES.cadeau }] },
     reglages: {
       titre: "Mon Compte", items: [
         { label: "Profil", route: "/settings/profile", icone: ICONES.utilisateur },
@@ -565,7 +566,9 @@
   };
   var groupesOuverts = { "ventes": true, "reglages-pdv": true };
 
-  function actif(route, chemin) { return chemin === route || chemin.indexOf(route + "/") === 0; }
+  function actif(route, chemin) {
+    if (route === "/customers" && chemin.indexOf("/customers/vouchers") === 0) return false;
+    return chemin === route || chemin.indexOf(route + "/") === 0; }
   function lienMenu(it, chemin, params, section) {
     var q = section === "rapports" && params.dateStart ? "?dateStart=" + params.dateStart + "&dateEnd=" + params.dateEnd : "";
     if (it.ancre) q = "?cat=" + encodeURIComponent(it.ancre);
@@ -629,7 +632,7 @@
   // Écrans sans source dans l'API officielle : masqués en mode « Réelles » (voir API-officielle.md)
   var HORS_API = ["/reports/stocks", "/reports/sales-report/fiscal", "/point-of-sale/meals", "/point-of-sale/settings/printers", "/point-of-sale/settings/prepa-stations",
     "/point-of-sale/settings/price-types", "/point-of-sale/settings/discounts", "/point-of-sale/settings/cash-movements", "/point-of-sale/settings/misc-settings",
-    "/reservations", "/customers", "/settings/profile", "/settings/auth-methods", "/settings/notifications", "/settings/users", "/settings/roles",
+    "/reservations", "/customers", "/customers/vouchers", "/settings/profile", "/settings/auth-methods", "/settings/notifications", "/settings/users", "/settings/roles",
     "/integrations", "/whats-new", "/help"];
   function horsApi(chemin) { return HORS_API.indexOf(chemin) >= 0 || chemin.indexOf("/customers/view/") === 0; }
 
