@@ -149,15 +149,164 @@
   A.ecran("/customers/view/:id", {
     section: "clients", fil: ["Fiches clients", "..."], actions: function () { return creer("Éditer la fiche client"); },
     rendre: function (ctx, zone) {
-      D.viewCustomer(ctx.ids.id).then(function (c) {
+      Promise.all([D.viewCustomer(ctx.ids.id), D.getVouchers()]).then(function (res) {
+        var c = res[0], bons = res[1].filter(function (b) { return c && b.clientId === c.id && b.statut !== "annule"; }).sort(function (a, b) { return a.expireLe < b.expireLe ? -1 : 1; });
         if (!c) { zone.innerHTML = A.vide("Client introuvable"); return; }
+        var cartesBons = A.carte("Bons cadeaux (cagnotte : " + A.euro(c.cagnotte) + ")", bons.length ? A.table([{ t: "Code" }, { a: "d", t: "Solde" }, { t: "Fin de validité" }, { t: "Statut" }],
+          bons.map(function (b) { return ['<span class="mono">' + E(b.code) + "</span>", A.euro(b.solde), A.dateMoyenne(b.expireLe), badgeStatutBon(b)]; }), null, { classe: "zebre" }) +
+          '<p class="doux petit"><a href="#/customers/vouchers">Gérer les bons cadeaux</a></p>' : A.vide("Aucun bon cadeau"));
         document.querySelector(".fil b").textContent = c.name;
         function champ(t, v, tel) { return '<div class="kpi grand"><div class="kpi-l">' + t + '</div><div class="kpi-v ' + (v ? "" : "gris") + '">' + (v ? E(v) + (tel ? " " + A.icones.autre : "") : "Non renseigné") + "</div></div>"; }
         A.act.onglet = function (o, el) { Array.prototype.forEach.call(el.parentNode.children, function (b) { b.classList.toggle("actif", b === el); }); };
         zone.innerHTML = '<div class="kpi grand"><div class="kpi-l">Nom prénom</div><div class="kpi-v"><span class="badge-site">' + E(A.siteSigle) + "</span> " + E(c.name) + "</div></div>" +
           '<div class="deux-col">' + champ("Téléphone", c.phone, true) + champ("Email", c.email) + champ("Adresse", c.address) + champ("Complément d'adresse", "") + champ("Ville", c.city) + champ("Code postal", c.zip) + "</div>" +
           champ("Entreprise", c.company) + '<div class="deux-col">' + champ("Nombre de commandes", String(c.orders)) + champ("Commandes impayées", String(c.unpaid)) + "</div>" +
+          cartesBons +
           A.carte("", '<div class="onglets-bouton plein"><button class="actif" data-act="onglet">Commandes payées</button><button data-act="onglet">Commandes impayées</button><button data-act="onglet">Dépôts</button></div>' + A.vide("Aucune donnée trouvée"));
+      });
+    }
+  });
+
+  // ======================================================================
+  // Bons cadeaux (données factices, gardées dans le navigateur)
+  // ======================================================================
+  var LIB_STATUT_BON = { actif: "Actif", expire: "Expiré", epuise: "Utilisé", annule: "Annulé" };
+  var CLASSE_STATUT_BON = { actif: "ok", expire: "ko", epuise: "neutre", annule: "neutre" };
+  function badgeStatutBon(b) { return '<span class="badge-bon ' + CLASSE_STATUT_BON[b.statut] + '">' + LIB_STATUT_BON[b.statut] + "</span>"; }
+  function joursRestants(iso) { return Math.round((A.depuisIso(iso).getTime() - A.depuisIso(A.aujourdhui()).getTime()) / 86400000); }
+  function texteDelai(j) {
+    if (j === 0) return "aujourd'hui";
+    if (j === 1) return "demain";
+    if (j > 1) return "dans " + j + " j";
+    return "il y a " + (-j) + " j";
+  }
+  // Date de fin + délai coloré : rouge ≤ 7 j ou expiré, orange ≤ 30 j
+  function celluleValidite(b) {
+    var j = joursRestants(b.expireLe), cl = "";
+    if (b.statut === "expire") cl = "ko";
+    else if (b.statut === "actif") cl = j <= 7 ? "ko" : j <= 30 ? "attention" : "neutre";
+    return A.dateMoyenne(b.expireLe) + (cl ? ' <span class="badge-bon ' + cl + '">' + (b.statut === "expire" ? "expiré " : "") + texteDelai(j) + "</span>" : "");
+  }
+  var LIB_HIST_BON = { creation: "Création", debit: "Utilisation", validite: "Validité modifiée", annulation: "Annulation" };
+
+  // Tiroir de création (b = null) ou de gestion d'un bon. rafraichir() recharge l'écran.
+  function tiroirBon(b, clients, rafraichir) {
+    var t = A.tiroir(""), creation = !b, ferme = !creation && (b.statut === "epuise" || b.statut === "annule");
+    var base = creation ? A.aujourdhui() : (b.statut === "expire" ? A.aujourdhui() : b.expireLe);
+    var DUREES = [["+ 1 mois", 1], ["+ 3 mois", 3], ["+ 6 mois", 6], ["+ 1 an", 12], ["+ 2 ans", 24]];
+    var MONTANTS = [20, 30, 50, 75, 100, 150];
+    function val(id) { var c = document.getElementById(id); return c ? c.value : ""; }
+    function erreur(m) { var e = document.getElementById("bon-err"); if (e) e.textContent = m || ""; }
+    function apercu() {
+      var m = creation ? parseFloat(val("bon-montant").replace(",", ".")) : b.solde, fin = val("bon-fin") || (b ? b.expireLe : "");
+      var el = document.getElementById("bon-apercu");
+      if (!el) return;
+      el.innerHTML = '<div class="bon-ap-montant">' + (isFinite(m) && m > 0 ? A.euro(m) : "— €") + '</div><div class="bon-ap-ligne">' + (fin ? "Valable jusqu'au " + A.dateLongue(fin).toLowerCase() : "Choisir une date de fin") + "</div>" +
+        '<div class="bon-ap-code">' + (creation ? "Code généré à l'enregistrement" : E(b.code)) + "</div>";
+      var aide = document.getElementById("bon-aide");
+      if (aide && fin) { var j = joursRestants(fin); aide.textContent = j < 0 ? "Date passée." : "Fin de validité : " + texteDelai(j) + (j > 0 ? " (" + j + " jours)" : ""); }
+    }
+    function dessiner() {
+      var hist = b ? b.historique.slice().reverse() : [];
+      t.innerHTML = '<div class="tiroir-tete"><div><h3>' + (creation ? "Nouveau bon cadeau" : "Bon " + E(b.code)) + "</h3>" +
+        '<span class="doux">' + (creation ? "Montant, date de fin de validité et bénéficiaire" : badgeStatutBon(b) + " · créé le " + A.dateMoyenne(b.creeLe) + (b.clientNom ? " · " + E(b.clientNom) : "")) + '</span></div><button class="fermer" data-fermer>✕</button></div>' +
+        '<div class="tiroir-corps"><div class="bandeau-factice">Données factices : gérées uniquement dans ce navigateur.</div>' +
+        '<div class="bon-apercu" id="bon-apercu"></div><div class="stk-form">' +
+        (creation ? '<label>Montant (€)<input id="bon-montant" type="number" min="1" step="any" inputmode="decimal"></label>' +
+          '<div class="bon-chips">' + MONTANTS.map(function (m) { return '<button type="button" class="bon-chip" data-montant="' + m + '">' + m + " €</button>"; }).join("") + "</div>" : "") +
+        (ferme ? "" : '<label>Fin de validité<input id="bon-fin" type="date" min="' + A.aujourdhui() + '" value="' + (creation ? D.ajouterMois(base, 12) : b.expireLe) + '"></label>' +
+          '<div class="bon-chips">' + DUREES.map(function (d) { return '<button type="button" class="bon-chip" data-mois="' + d[1] + '">' + (creation ? d[0].replace("+ ", "") : d[0]) + "</button>"; }).join("") + "</div>" +
+          '<p class="doux" id="bon-aide"></p>' +
+          (!creation && b.statut === "expire" ? '<p class="doux">Ce bon est expiré : choisir une nouvelle date le réactive.</p>' : "")) +
+        (creation ? '<label>Bénéficiaire (facultatif)<select id="bon-client"><option value="">Aucun (bon à offrir)</option>' + clients.map(function (c) { return '<option value="' + E(c.id) + '">' + E(c.name) + "</option>"; }).join("") + "</select></label>" : "") +
+        '<label>Occasion / note (facultatif)<input id="bon-note" type="text" maxlength="80" value="' + (b ? E(b.note) : "") + '"></label>' +
+        '<div class="stk-erreur" id="bon-err"></div></div>' +
+        (!creation && b.statut === "actif" ? '<h4 class="stk-titre">Utiliser le bon</h4><div class="bon-ligne"><input id="bon-debit" type="number" min="0" step="any" inputmode="decimal" placeholder="Montant utilisé (solde : ' + b.solde + ' €)"><button class="bouton" data-debiter>Débiter</button></div>' : "") +
+        (!creation ? '<h4 class="stk-titre">Historique</h4>' + A.table([{ t: "Date" }, { t: "Événement" }, { a: "d", t: "Montant" }, { t: "Détail" }],
+          hist.map(function (h) { return [A.dateMoyenne(h.date), LIB_HIST_BON[h.type], h.montant ? A.euro(h.montant) : "-", E(h.note || "-")]; }), null, { classe: "zebre" }) : "") +
+        (!creation && b.statut !== "annule" ? '<p><button class="bouton rouge" data-annuler>Annuler ce bon</button></p>' : "") +
+        '</div><div class="tiroir-pied"><button class="bouton" data-fermer>' + (ferme ? "Fermer" : "Annuler") + '</button><span class="td-espace"></span>' +
+        (ferme ? "" : '<button class="bouton sombre" data-valider>' + (creation ? "Créer le bon" : "Enregistrer") + "</button>") + "</div>";
+      apercu();
+    }
+    t.addEventListener("input", apercu);
+    t.addEventListener("click", function (e) {
+      var c = e.target.closest("[data-fermer],[data-valider],[data-montant],[data-mois],[data-debiter],[data-annuler]");
+      if (!c) return;
+      if (c.hasAttribute("data-fermer")) A.fermerTiroir();
+      else if (c.hasAttribute("data-montant")) { document.getElementById("bon-montant").value = c.getAttribute("data-montant"); apercu(); }
+      else if (c.hasAttribute("data-mois")) {
+        // création : à partir d'aujourd'hui ; gestion : à partir de la fin actuelle (ou d'aujourd'hui si expiré)
+        document.getElementById("bon-fin").value = D.ajouterMois(creation ? A.aujourdhui() : (val("bon-fin") && val("bon-fin") > base ? val("bon-fin") : base), +c.getAttribute("data-mois")); apercu();
+      } else if (c.hasAttribute("data-debiter")) {
+        D.debitVoucher(b.id, val("bon-debit")).then(function () { A.fermerTiroir(); A.info("Bon débité."); rafraichir(); }, function (m) { erreur(String(m)); });
+      } else if (c.hasAttribute("data-annuler")) {
+        if (window.confirm("Annuler définitivement ce bon cadeau ?")) D.cancelVoucher(b.id).then(function () { A.fermerTiroir(); A.info("Bon annulé."); rafraichir(); });
+      } else {
+        var p = creation
+          ? D.createVoucher({ montant: parseFloat(val("bon-montant").replace(",", ".")), expireLe: val("bon-fin"), clientId: val("bon-client"), note: val("bon-note").trim() })
+          : D.updateVoucher(b.id, { expireLe: val("bon-fin"), note: val("bon-note").trim() });
+        p.then(function (nb) { A.fermerTiroir(); A.info(creation ? "Bon " + nb.code + " créé." : "Bon mis à jour."); rafraichir(); }, function (m) { erreur(String(m)); });
+      }
+    });
+    dessiner();
+    var f = document.getElementById(creation ? "bon-montant" : "bon-fin"); if (f) f.focus();
+  }
+
+  A.ecran("/customers/vouchers", {
+    section: "clients", fil: ["Fiches clients", "Bons cadeaux"],
+    actions: function () { return A.bouton("Créer un bon cadeau", "bonNouveau", { classe: "sombre" }); },
+    rendre: function (ctx, zone) {
+      Promise.all([D.getVouchers(), D.getCustomers()]).then(function (res) {
+        var tous = res[0], clients = res[1], et = ctx.etat, filtre = et.filtre || "actif", tri = et.tri || "fin";
+        function proche(b) { return b.statut === "actif" && joursRestants(b.expireLe) <= 30; }
+        var nb = { tous: tous.length, actif: 0, proche: 0, expire: 0, clos: 0 }, encours = 0, perdu = 0, montantProche = 0;
+        tous.forEach(function (b) {
+          if (b.statut === "actif") { nb.actif++; encours += b.solde; }
+          if (proche(b)) { nb.proche++; montantProche += b.solde; }
+          if (b.statut === "expire") { nb.expire++; perdu += b.solde; }
+          if (b.statut === "epuise" || b.statut === "annule") nb.clos++;
+        });
+        var vue = tous.filter(function (b) {
+          return filtre === "tous" || (filtre === "proche" ? proche(b) : filtre === "clos" ? (b.statut === "epuise" || b.statut === "annule") : b.statut === filtre);
+        });
+        // Tri par défaut : fin de validité la plus proche d'abord
+        vue.sort(function (a, b) {
+          if (tri === "solde") return b.solde - a.solde;
+          if (tri === "recent") return a.creeLe < b.creeLe ? 1 : -1;
+          return a.expireLe < b.expireLe ? -1 : a.expireLe > b.expireLe ? 1 : 0;
+        });
+        function recharger() { ctx.rafraichir(); }
+        A.act.bonNouveau = function () { tiroirBon(null, clients, recharger); };
+        A.act.bonOuvrir = function (id) { var b = tous.filter(function (x) { return x.id === id; })[0]; if (b) tiroirBon(b, clients, recharger); };
+        var puces = [["actif", "Actifs"], ["proche", "Expirent sous 30 j"], ["expire", "Expirés"], ["clos", "Utilisés / annulés"], ["tous", "Tous"]];
+        var onglets = '<div class="onglets-bouton plein">' + puces.map(function (p) {
+          return '<button class="' + (p[0] === filtre ? "actif" : "") + '" data-act="bonFiltre" data-val="' + p[0] + '">' + p[1] + " (" + nb[p[0]] + ")</button>";
+        }).join("") + "</div>";
+        A.act.bonFiltre = function (v) { et.filtre = v; ctx.rafraichir(); };
+        var triListe = A.liste("bonTri", "Fin de validité : plus proche d'abord", [["solde", "Solde le plus élevé"], ["recent", "Créés récemment"]], tri === "fin" ? "" : tri, function (v) { et.tri = v || "fin"; ctx.rafraichir(); });
+        A.act.export = function () {
+          A.telechargerCsv("bons-cadeaux.csv", ["Code", "Bénéficiaire", "Montant", "Solde", "Créé le", "Fin de validité", "Statut", "Note"],
+            vue.map(function (b) { return [b.code, b.clientNom, A.montantCsv(b.montant), A.montantCsv(b.solde), b.creeLe, b.expireLe, LIB_STATUT_BON[b.statut], b.note]; }));
+        };
+        zone.innerHTML = '<div class="bandeau-factice"><b>Données factices.</b> Les bons cadeaux ne sont pas fournis par l\'API : ils sont inventés et ne sont enregistrés que dans ce navigateur.</div>' +
+          A.kpis([["Bons actifs", A.entier(nb.actif)], ["Solde à consommer", A.euro(encours)], ["Expirent sous 30 jours", A.entier(nb.proche) + " · " + A.euro(montantProche)], ["Solde expiré non utilisé", '<span class="' + (perdu ? "rouge" : "") + '">' + A.euro(perdu) + "</span>"]]) +
+          A.carte("Bons cadeaux", onglets + '<div id="td"></div>', { classe: "avec-tableau" });
+        A.monterTable(document.getElementById("td"), {
+          colonnes: [
+            { t: "Code", f: function (b) { return '<span class="mono">' + E(b.code) + "</span>"; }, tri: function (b) { return b.code; } },
+            { t: "Bénéficiaire", f: function (b) { return b.clientNom ? E(b.clientNom) : '<span class="doux">Bon à offrir</span>'; }, tri: function (b) { return b.clientNom; } },
+            { t: "Montant", a: "d", f: function (b) { return A.euro(b.montant); }, tri: function (b) { return b.montant; } },
+            { t: "Solde", a: "d", f: function (b) { return "<b>" + A.euro(b.solde) + "</b>"; }, tri: function (b) { return b.solde; } },
+            { t: "Créé le", f: function (b) { return A.dateMoyenne(b.creeLe); }, tri: function (b) { return b.creeLe; } },
+            { t: "Fin de validité", f: celluleValidite, tri: function (b) { return b.expireLe; } },
+            { t: "Statut", f: badgeStatutBon, tri: function (b) { return b.statut; } },
+            { t: "Note", f: function (b) { return E(b.note); }, cache: true },
+            { t: "", f: function () { return '<span class="bouton-icone">' + A.icones.crayon + "</span>"; }, tri: function () { return 0; } }],
+          lignes: vue, pageSize: 20, sansFiltrer: true, filtres: triListe, droite: A.bouton("Exporter CSV", "export", { classe: "bouton-export", chevron: true }),
+          vide: "Aucun bon cadeau dans cette catégorie", rech: { ph: "Rechercher un code ou un bénéficiaire", texte: function (b) { return b.code + " " + b.clientNom + " " + b.note; } },
+          onLigne: function (b) { A.act.bonOuvrir(b.id); }
+        });
       });
     }
   });

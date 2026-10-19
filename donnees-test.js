@@ -1054,8 +1054,116 @@
     var cv = 0; liste.forEach(function (r) { cv += r.couverts; });
     return reponse({ reservations: liste, totalNumberOfGuests: cv });
   }
-  function getCustomers() { return reponse(CLIENTS); }
-  function viewCustomer(id) { return reponse(CLIENTS.filter(function (c) { return c.id === id; })[0] || null); }
+  // ---- Bons cadeaux : PARTIE FACTICE (aucune source dans l'API), gardés dans le navigateur ----
+  // Un bon : { id, code, montant, solde, creeLe, expireLe, clientId, note, annule, historique:[{date,type,montant,note}] }
+  var CLE_BONS = "bons-factices";
+  var BONS = null;
+  function ajouterJours(iso, n) { var d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return jourIso(d); }
+  function ajouterMois(iso, n) {
+    var d = new Date(iso + "T12:00:00"), j = d.getDate();
+    d.setDate(1); d.setMonth(d.getMonth() + n);
+    d.setDate(Math.min(j, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+    return jourIso(d);
+  }
+  function statutBon(b) {
+    if (b.annule) return "annule";
+    if (b.solde <= 0) return "epuise";
+    return b.expireLe < AUJ_ISO ? "expire" : "actif";
+  }
+  function initBons() {
+    if (BONS) return;
+    try {
+      var s = JSON.parse(localStorage.getItem(CLE_BONS) || "null");
+      if (s && s.length) { BONS = s; return; }
+    } catch (e) { /* stockage indisponible ou illisible : on régénère */ }
+    // Générateur propre (graine fixe) pour ne pas décaler les autres données inventées
+    var g = 20261019;
+    function r() { g = (g * 1103515245 + 12345) % 2147483648; return g / 2147483648; }
+    var lettres = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    function code() { var c = "BC-"; for (var i = 0; i < 6; i++) c += lettres.charAt(Math.floor(r() * lettres.length)) + (i === 3 ? "-" : ""); return c; }
+    var montants = [20, 25, 30, 50, 50, 75, 100, 150];
+    var notes = ["", "", "Anniversaire", "Noël", "Cadeau d'entreprise", "Offert par la maison", "Fête des mères", "Remerciement"];
+    BONS = [];
+    for (var i = 0; i < 24; i++) {
+      var m = montants[Math.floor(r() * montants.length)], cree = ajouterJours(AUJ_ISO, -Math.floor(r() * 300) - 5);
+      var duree = [3, 6, 12, 12, 24][Math.floor(r() * 5)], expire = ajouterMois(cree, duree);
+      var type = i % 8 === 0 ? "epuise" : i % 11 === 5 ? "annule" : i % 5 === 3 ? "partiel" : "plein";
+      if (i < 5 && type !== "partiel") type = "plein";
+      var solde = type === "epuise" ? 0 : type === "partiel" ? Math.max(5, Math.round(m * (0.2 + r() * 0.6))) : m;
+      // quelques bons proches de leur fin de validité pour illustrer le tri et les alertes
+      if (i < 5) expire = ajouterJours(AUJ_ISO, [3, 9, 18, 26, 45][i]);
+      var hist = [{ date: cree, type: "creation", montant: m, note: "" }];
+      if (solde < m) hist.push({ date: ajouterJours(cree, Math.floor(r() * 30) + 1), type: "debit", montant: arrondi(m - solde), note: "Utilisé en caisse" });
+      BONS.push({
+        id: "b" + (i + 1), code: code(), montant: m, solde: solde, creeLe: cree, expireLe: expire,
+        clientId: r() < 0.6 ? "k" + (Math.floor(r() * 120) + 1) : "", note: notes[Math.floor(r() * notes.length)],
+        annule: type === "annule", historique: hist
+      });
+    }
+  }
+  function sauverBons() { try { localStorage.setItem(CLE_BONS, JSON.stringify(BONS)); } catch (e) { /* stockage indisponible */ } }
+  function bonComplet(b) {
+    var c = CLIENTS.filter(function (x) { return x.id === b.clientId; })[0];
+    var o = copie(b); o.statut = statutBon(b); o.clientNom = c ? c.name : ""; return o;
+  }
+  function getVouchers() { initBons(); return reponse(BONS.map(bonComplet)); }
+  function trouverBon(id) { initBons(); return BONS.filter(function (b) { return b.id === id; })[0]; }
+  // v = { montant, expireLe, clientId, note } ; rejette avec un message si invalide
+  function createVoucher(v) {
+    initBons();
+    var m = Math.round(+v.montant * 100) / 100;
+    if (!isFinite(m) || m <= 0) return Promise.reject("Saisir un montant supérieur à 0.");
+    if (m > 5000) return Promise.reject("Montant maximum : 5 000 €.");
+    if (!v.expireLe) return Promise.reject("Choisir une date de fin de validité.");
+    if (v.expireLe < AUJ_ISO) return Promise.reject("La fin de validité ne peut pas être dans le passé.");
+    var n = BONS.length + 1, code = "BC-" + ("0000" + Math.floor(Math.random() * 1679616).toString(36).toUpperCase()).slice(-4) + "-" + ("00" + n).slice(-2);
+    var b = { id: "b" + Date.now(), code: code, montant: m, solde: m, creeLe: AUJ_ISO, expireLe: v.expireLe, clientId: v.clientId || "", note: v.note || "", annule: false,
+      historique: [{ date: AUJ_ISO, type: "creation", montant: m, note: "" }] };
+    BONS.push(b); sauverBons();
+    return reponse(bonComplet(b));
+  }
+  // Change la date de fin de validité (prolonger ou raccourcir) et/ou la note
+  function updateVoucher(id, ch) {
+    var b = trouverBon(id);
+    if (!b) return Promise.reject("Bon introuvable.");
+    if (b.annule) return Promise.reject("Ce bon est annulé.");
+    if (ch.expireLe !== undefined) {
+      if (!ch.expireLe) return Promise.reject("Choisir une date de fin de validité.");
+      if (ch.expireLe < AUJ_ISO) return Promise.reject("La fin de validité ne peut pas être dans le passé.");
+      if (ch.expireLe !== b.expireLe) { b.historique.push({ date: AUJ_ISO, type: "validite", montant: 0, note: "Validité : " + b.expireLe + " → " + ch.expireLe }); b.expireLe = ch.expireLe; }
+    }
+    if (ch.note !== undefined) b.note = ch.note;
+    sauverBons();
+    return reponse(bonComplet(b));
+  }
+  function debitVoucher(id, montant, note) {
+    var b = trouverBon(id), m = Math.round(+montant * 100) / 100;
+    if (!b) return Promise.reject("Bon introuvable.");
+    if (statutBon(b) !== "actif") return Promise.reject("Ce bon n'est plus utilisable.");
+    if (!isFinite(m) || m <= 0) return Promise.reject("Saisir un montant supérieur à 0.");
+    if (m > b.solde) return Promise.reject("Le montant dépasse le solde du bon (" + b.solde + " €).");
+    b.solde = Math.round((b.solde - m) * 100) / 100;
+    b.historique.push({ date: AUJ_ISO, type: "debit", montant: m, note: note || "Utilisé en caisse" });
+    sauverBons();
+    return reponse(bonComplet(b));
+  }
+  function cancelVoucher(id) {
+    var b = trouverBon(id);
+    if (!b) return Promise.reject("Bon introuvable.");
+    b.annule = true; b.historique.push({ date: AUJ_ISO, type: "annulation", montant: b.solde, note: "" });
+    sauverBons();
+    return reponse(bonComplet(b));
+  }
+  // La cagnotte d'un client = solde de ses bons cadeaux encore valables
+  function cagnotteClient(c) {
+    initBons();
+    var o = copie(c), t = 0;
+    BONS.forEach(function (b) { if (b.clientId === c.id && statutBon(b) === "actif") t += b.solde; });
+    o.cagnotte = arrondi(t);
+    return o;
+  }
+  function getCustomers() { return reponse(CLIENTS.map(cagnotteClient)); }
+  function viewCustomer(id) { var c = CLIENTS.filter(function (x) { return x.id === id; })[0]; return reponse(c ? cagnotteClient(c) : null); }
 
   // ======================================================================
   // API : réglages, intégrations, contenus
@@ -1202,6 +1310,8 @@
     getAllPayments: getAllPayments, getReceiptSettings: getReceiptSettings, getMiscSettings: getMiscSettings,
     getLogicalDevices: getLogicalDevices, getLayout: getLayout,
     getReservationList: getReservationList, getCustomers: getCustomers, viewCustomer: viewCustomer,
+    getVouchers: getVouchers, createVoucher: createVoucher, updateVoucher: updateVoucher, debitVoucher: debitVoucher, cancelVoucher: cancelVoucher,
+    ajouterJours: ajouterJours, ajouterMois: ajouterMois,
     getOrganizationUsers: getOrganizationUsers, getRoles: getRoles, getProfile: getProfile,
     getIntegrationList: getIntegrationList, getNews: getNews, getAgencyInfo: getAgencyInfo
   };
