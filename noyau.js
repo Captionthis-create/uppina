@@ -741,7 +741,7 @@
       '<div class="compte-ligne"><span>' + ICONES.soleil + 'Météo</span><div class="segment">' +
       '<button class="' + (App.meteoActif() ? "" : "actif") + '" data-act="meteo" data-val="0">Off</button>' +
       '<button class="' + (App.meteoActif() ? "actif" : "") + '" data-act="meteo" data-val="1">On</button></div></div>' +
-      (App.meteoActif() ? '<div class="compte-note">Ville : outils\\meteo-lieu.txt (sinon celle du lieu). Mise à jour : Lancer Up\'Pina.bat.</div>' : "") +
+      (App.meteoActif() ? '<div class="compte-note">Ville : outils\\meteo-lieu.txt (sinon celle du lieu). Mise à jour : Lancer Pop\'IA.bat.</div>' : "") +
       '<a class="choix-compte" href="#/settings/profile">' + ICONES.engrenage + "Réglages</a>" +
       '<a class="choix-compte" href="#/integrations">' + ICONES.options + "Intégrations</a><hr>" +
       '<button class="choix-compte doux" data-act="nondispo">Conditions d\'utilisation</button>' +

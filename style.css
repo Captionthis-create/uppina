@@ -57,7 +57,7 @@ hr { border: 0; border-top: 1px solid var(--ligne); margin: 8px 0; }
 /* ---- En-tête ---- */
 .entete { position: relative; background: var(--carte); border-bottom: 1px solid var(--bordure); height: 98px; }
 .logo { position: absolute; left: 24px; top: 24px; font-size: 19px; font-weight: 600; display: flex; align-items: center; gap: 9px; }
-.logo-icone { width: 18px; height: 24px; }
+.logo-icone { width: 26px; height: 26px; }
 .entete-liens { position: absolute; right: 20px; top: 16px; display: flex; align-items: center; gap: 14px; color: var(--texte-doux); font-size: 12px; }
 .entete-liens > a:hover, .entete-liens > a.actif { color: var(--texte); }
 .entete-liens > a.actif { font-weight: 600; }
