@@ -60,7 +60,7 @@
     return r.factice ? '<div class="bandeau-factice">Données factices : en mode Test, la météo des jours passés est inventée. Aujourd\'hui et les jours à venir sont réels.</div>' : "";
   }
   function messageAbsent() {
-    return A.vide("Météo non récupérée. Lancez Lancer Up'Pina.bat (ou outils\\recuperer-meteo.ps1).");
+    return A.vide("Météo non récupérée. Lancez Lancer Pop'IA.bat (ou outils\\recuperer-meteo.ps1).");
   }
 
   // Carte du Tableau de bord : score et chiffres de la période, comparés à l'autre période, avec courbe du score par jour.
