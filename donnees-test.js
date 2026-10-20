@@ -348,7 +348,12 @@
   // Agrégats
   // ======================================================================
   function dans(iso, p) { return iso >= p.dateStart && iso <= p.dateEnd; }
-  function commandesDe(p) { return COMMANDES.filter(function (c) { return dans(c.date, p); }); }
+  // Tranche facultative portée par la période : p.jours (tableau, 0 = dimanche), p.h1 / p.h2 (minutes du jour, h2 exclu)
+  var DOW = {};
+  function jourSemaine(iso) { return DOW[iso] !== undefined ? DOW[iso] : (DOW[iso] = new Date(iso + "T12:00:00").getDay()); }
+  function jourOk(iso, p) { return !p.jours || p.jours.indexOf(jourSemaine(iso)) >= 0; }
+  function heureOk(c, p) { return (p.h1 == null || c.min >= p.h1) && (p.h2 == null || c.min < p.h2); }
+  function commandesDe(p) { return COMMANDES.filter(function (c) { return dans(c.date, p) && jourOk(c.date, p) && heureOk(c, p); }); }
   function payees(p) { return commandesDe(p).filter(function (c) { return c.statut === "paid"; }); }
   function produitParId(id) { return PRODUITS.filter(function (x) { return x.id === id; })[0]; }
   function ht(ttc, tva) { return ttc / (1 + tva / 100); }
@@ -456,14 +461,21 @@
   // ======================================================================
   function getReportTotalSales(p) {
     var jours = [], d = new Date(p.dateStart + "T12:00:00"), fin = new Date(p.dateEnd + "T12:00:00");
-    var cm = payees(p), tot = totaux(cm);
+    var cm = payees(p), tot = totaux(cm), parJour = {}, occurrences = 0, ouverts = 0;
+    cm.forEach(function (c) { (parJour[c.date] = parJour[c.date] || []).push(c); });
     while (d <= fin) {
-      var iso = jourIso(d), t = totaux(payees({ dateStart: iso, dateEnd: iso }));
-      jours.push({ date: iso, totalSales: t.ttc, totalSalesWithoutTaxes: t.ht });
+      var iso = jourIso(d);
+      if (jourOk(iso, p)) {
+        var t = totaux(parJour[iso] || []);
+        jours.push({ date: iso, totalSales: t.ttc, totalSalesWithoutTaxes: t.ht });
+        if (iso <= AUJ_ISO) occurrences++;
+        if (parJour[iso]) ouverts++;
+      }
       d.setDate(d.getDate() + 1);
     }
     var tills = {}; cm.forEach(function (c) { tills[c.caisse] = 1; });
     return reponse({
+      occurrences: occurrences, joursOuverts: ouverts,
       totalSales: tot.ttc, totalSalesWithoutTaxes: tot.ht, guestsNumber: tot.couverts, orderCount: cm.length,
       averageGuest: tot.couverts ? arrondi(tot.ttc / tot.couverts) : 0, closedTillsCount: Object.keys(tills).length, reportFromPeriod: jours
     });
