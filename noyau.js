@@ -195,6 +195,94 @@
   };
 
   // ======================================================================
+  // Tranche : jours de la semaine + plage horaire (« tous mes lundis de 11h à 15h »)
+  // Dans l'URL : jours=1,2 (0 = dimanche), de=11:00, a=15:00. Elle s'ajoute à la période pour interroger DonneesTest.
+  // ======================================================================
+  var JOURS_PLURIEL = ["dimanches", "lundis", "mardis", "mercredis", "jeudis", "vendredis", "samedis"];
+  var JOURS_ABR = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+  var ORDRE_JOURS = [1, 2, 3, 4, 5, 6, 0];
+  function enMinutes(s) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(s || "");
+    if (!m) return null;
+    var n = +m[1] * 60 + +m[2];
+    return n === 1439 ? 1440 : n; // 23:59 = jusqu'à minuit
+  }
+  function enHeure(n) { if (n === 1440) n = 1439; return (n < 600 ? "0" : "") + Math.floor(n / 60) + ":" + (n % 60 < 10 ? "0" : "") + (n % 60); }
+  App.lireTranche = function (params) {
+    var j = (params.jours || "").split(",").filter(function (x) { return x !== "" && +x >= 0 && +x <= 6; }).map(Number);
+    var h1 = enMinutes(params.de), h2 = enMinutes(params.a);
+    if (h1 !== null && h2 !== null && h1 > h2) { var t = h1; h1 = h2; h2 = t; }
+    if (!j.length && h1 === null && h2 === null) return null;
+    return { jours: j.length ? j : null, h1: h1, h2: h2 };
+  };
+  App.paramsTranche = function (tr) {
+    var q = {};
+    if (!tr) return q;
+    if (tr.jours) q.jours = tr.jours.join(",");
+    if (tr.h1 !== null) q.de = enHeure(tr.h1);
+    if (tr.h2 !== null) q.a = enHeure(tr.h2);
+    return q;
+  };
+  // Période + tranche, au format attendu par DonneesTest
+  App.avecTranche = function (p, tr) {
+    var r = { dateStart: p.dateStart, dateEnd: p.dateEnd };
+    if (tr) { if (tr.jours) r.jours = tr.jours; if (tr.h1 !== null) r.h1 = tr.h1; if (tr.h2 !== null) r.h2 = tr.h2; }
+    return r;
+  };
+  function fusion(a, b) { var r = {}, k; for (k in a) r[k] = a[k]; for (k in b) r[k] = b[k]; return r; }
+  function requeteTranche(tr) {
+    var q = App.paramsTranche(tr);
+    return Object.keys(q).map(function (k) { return "&" + k + "=" + encodeURIComponent(q[k]); }).join("");
+  }
+  App.libelleTranche = function (tr) {
+    var parts = [];
+    if (tr.jours) {
+      var tous = tr.jours.length === 7;
+      parts.push(tous ? "Tous les jours" : tr.jours.length === 1 ? App.majuscule(JOURS_PLURIEL[tr.jours[0]]) :
+        ORDRE_JOURS.filter(function (d) { return tr.jours.indexOf(d) >= 0; }).map(function (d) { return JOURS_ABR[d]; }).join(" "));
+    }
+    if (tr.h1 !== null || tr.h2 !== null) parts.push((tr.h1 !== null ? enHeure(tr.h1) : "00:00") + "–" + (tr.h2 !== null ? enHeure(tr.h2) : "24:00"));
+    return parts.join(" · ");
+  };
+  // Nom du jour au pluriel pour les libellés (« 30 lundis ») ; null si plusieurs jours ou aucun
+  App.nomJourTranche = function (tr) { return tr && tr.jours && tr.jours.length === 1 ? JOURS_PLURIEL[tr.jours[0]] : null; };
+
+  function htmlFiltreTranche(ctx) {
+    var tr = ctx.tranche, jours = tr && tr.jours || [];
+    var puces = ORDRE_JOURS.map(function (d) {
+      return '<button type="button" class="puce-jour' + (jours.indexOf(d) >= 0 ? " actif" : "") + '" data-tr-jour="' + d + '" title="' + E(App.majuscule(JOURS_PLURIEL[d])) + '">' + E(JOURS_ABR[d].charAt(0).toUpperCase()) + "</button>";
+    }).join("");
+    return '<div class="menu-conteneur"><button class="bouton' + (tr ? " bouton-tranche" : "") + '" data-ouvre="tranche">' + (tr ? E(App.libelleTranche(tr)) : "Jours &amp; heures") + App.icones.basPetit + "</button>" +
+      '<div class="menu-flottant menu-tranche" id="menu-tranche">' +
+      '<div class="tr-titre">Jours de la semaine</div><div class="tr-jours">' + puces + "</div>" +
+      '<div class="tr-titre">Plage horaire</div><div class="tr-heures"><label>De<input type="time" id="tr-de" value="' + (tr && tr.h1 !== null ? enHeure(tr.h1) : "") + '"></label>' +
+      '<label>À<input type="time" id="tr-a" value="' + (tr && tr.h2 !== null ? enHeure(tr.h2) : "") + '"></label></div>' +
+      '<div class="tr-raccourcis"><button type="button" class="bouton" data-tr-preset="11:00-15:00">Service midi</button><button type="button" class="bouton" data-tr-preset="18:00-23:59">Service soir</button></div>' +
+      '<div class="tr-pied"><button type="button" class="bouton" data-tr-clear>Effacer</button><button type="button" class="bouton sombre" data-tr-ok>Appliquer</button></div>' +
+      "</div></div>";
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest ? e.target.closest("[data-tr-jour],[data-tr-preset],[data-tr-ok],[data-tr-clear]") : null;
+    var ctx = App.ctxCourant;
+    if (!t || !ctx) return;
+    if (t.hasAttribute("data-tr-jour")) { t.classList.toggle("actif"); return; }
+    if (t.hasAttribute("data-tr-preset")) {
+      var h = t.getAttribute("data-tr-preset").split("-");
+      document.getElementById("tr-de").value = h[0]; document.getElementById("tr-a").value = h[1];
+      return;
+    }
+    var params = {};
+    if (t.hasAttribute("data-tr-ok")) {
+      var js = Array.prototype.map.call(document.querySelectorAll("#menu-tranche .puce-jour.actif"), function (b) { return b.getAttribute("data-tr-jour"); });
+      if (js.length) params.jours = js.join(",");
+      var de = document.getElementById("tr-de").value, a = document.getElementById("tr-a").value;
+      if (de) params.de = de;
+      if (a) params.a = a;
+    }
+    ctx.naviguer(ctx.periode, App.lireTranche(params));
+  });
+
+  // ======================================================================
   // Menus déroulants, boutons, segments : tout passe par des clics délégués
   // ======================================================================
   App.fermerMenus = function () {
@@ -570,7 +658,7 @@
     if (route === "/customers" && chemin.indexOf("/customers/vouchers") === 0) return false;
     return chemin === route || chemin.indexOf(route + "/") === 0; }
   function lienMenu(it, chemin, params, section) {
-    var q = section === "rapports" && params.dateStart ? "?dateStart=" + params.dateStart + "&dateEnd=" + params.dateEnd : "";
+    var q = section === "rapports" && params.dateStart ? "?dateStart=" + params.dateStart + "&dateEnd=" + params.dateEnd + requeteTranche(params.tr) : "";
     if (it.ancre) q = "?cat=" + encodeURIComponent(it.ancre);
     var ok = it.ancre ? false : actif(it.route, chemin);
     return '<a href="#' + it.route + q + '" class="' + (it.icone ? "niveau1" : "") + (ok ? " actif" : "") + '">' + (it.icone || "") + E(it.label) + "</a>";
@@ -646,6 +734,10 @@
     var ctx = { chemin: chemin, params: url.params, ids: m ? m.ids : {}, etat: (App.etat[chemin] = App.etat[chemin] || {}) };
     var defaut = cfg.periodeJour ? App.periodeJour(0) : App.periodeMois();
     ctx.periode = url.params.dateStart && url.params.dateEnd ? { dateStart: url.params.dateStart, dateEnd: url.params.dateEnd } : defaut;
+    ctx.tranche = App.lireTranche(url.params);
+    // Navigation en gardant (ou changeant) la tranche jours/heures
+    ctx.naviguer = function (p, tr) { App.allerA(chemin, fusion({ dateStart: p.dateStart, dateEnd: p.dateEnd }, App.paramsTranche(tr))); };
+    App.ctxCourant = ctx;
     if (cfg.titreFil) cfg.fil = cfg.titreFil(ctx);
 
     var fil = typeof cfg.fil === "function" ? cfg.fil(ctx) : cfg.fil || [];
@@ -655,6 +747,7 @@
     if (typeof filtres === "function") htmlFiltres = filtres(ctx);
     else filtres.forEach(function (f) {
       if (f === "periode") htmlFiltres += htmlFiltrePeriode(ctx.periode);
+      else if (f === "tranche") htmlFiltres += htmlFiltreTranche(ctx);
       else if (f === "sites") htmlFiltres += htmlFiltreSites();
       else if (typeof f === "function") htmlFiltres += f(ctx);
       else htmlFiltres += f; // du HTML déjà prêt
@@ -666,10 +759,10 @@
       '</span><div class="actions">' + actions + "</div></div>" +
       (htmlFiltres ? '<div class="filtres">' + htmlFiltres + "</div>" : "") + "</div>";
 
-    var corps = '<section class="contenu"><div class="contenu-centre ' + (cfg.large ? "large" : "") + '">' + bandeau + '<div id="zone-meteo"></div><div id="zone-ecran"></div></div></section>';
+    var corps = '<section class="contenu"><div class="contenu-centre ' + (cfg.large ? "large" : "") + '">' + bandeau + '<div id="zone-tranche"></div><div id="zone-meteo"></div><div id="zone-ecran"></div></div></section>';
     document.getElementById("page").innerHTML =
       '<div class="mise-en-page' + (cfg.section ? "" : " sans-barre") + '">' +
-      (cfg.section ? '<button class="bouton bouton-menu-lat" data-act="menu-lat">☰ Menu ' + E(SECTIONS[cfg.section].titre) + "</button>" + barreLaterale(cfg.section, chemin, ctx.periode) : "") + corps + "</div>";
+      (cfg.section ? '<button class="bouton bouton-menu-lat" data-act="menu-lat">☰ Menu ' + E(SECTIONS[cfg.section].titre) + "</button>" + barreLaterale(cfg.section, chemin, { dateStart: ctx.periode.dateStart, dateEnd: ctx.periode.dateEnd, tr: ctx.tranche }) : "") + corps + "</div>";
     // Téléphone : la barre latérale devient un menu repliable (fermé par défaut)
     App.act["menu-lat"] = function () {
       var b = document.querySelector(".barre-laterale");
@@ -680,17 +773,22 @@
     App.garderMenuLat = false;
 
     // Actions de la période
-    App.act["periode-prec"] = function () { App.allerA(chemin, App.decalerPeriode(ctx.periode, -1)); };
-    App.act["periode-suiv"] = function () { App.allerA(chemin, App.decalerPeriode(ctx.periode, 1)); };
+    App.act["periode-prec"] = function () { ctx.naviguer(App.decalerPeriode(ctx.periode, -1), ctx.tranche); };
+    App.act["periode-suiv"] = function () { ctx.naviguer(App.decalerPeriode(ctx.periode, 1), ctx.tranche); };
     App.act["plage-ok"] = function () {
       var d = document.getElementById("plage-debut").value, f = document.getElementById("plage-fin").value;
       if (!d || !f) return;
       if (d > f) { var t = d; d = f; f = t; }
-      App.allerA(chemin, { dateStart: d, dateEnd: f });
+      ctx.naviguer({ dateStart: d, dateEnd: f }, ctx.tranche);
     };
     Array.prototype.forEach.call(document.querySelectorAll("#menu-periode .choix"), function (b) {
-      b.onclick = function (e) { e.stopPropagation(); App.allerA(chemin, { dateStart: b.getAttribute("data-debut"), dateEnd: b.getAttribute("data-fin") }); };
+      b.onclick = function (e) { e.stopPropagation(); ctx.naviguer({ dateStart: b.getAttribute("data-debut"), dateEnd: b.getAttribute("data-fin") }, ctx.tranche); };
     });
+    // Rappel de la tranche active (sur les écrans qui la gèrent), avec un lien pour la retirer
+    if (ctx.tranche && filtres.indexOf && filtres.indexOf("tranche") >= 0) {
+      document.getElementById("zone-tranche").innerHTML = '<div class="bandeau-tranche"><span>Filtre actif : <b>' + E(App.libelleTranche(ctx.tranche)) + "</b> · les chiffres ne portent que sur cette tranche.</span>" +
+        '<button class="bouton" data-tr-clear>Retirer</button></div>';
+    }
     var zone = document.getElementById("zone-ecran");
     ctx.zone = zone;
     ctx.rafraichir = function () { App.afficher(); };
