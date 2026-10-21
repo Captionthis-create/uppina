@@ -149,7 +149,7 @@
 
   function analyser(t) {
     var q = { intention: lireIntention(t), type: lireType(t), n: 10, nExplicite: false, asc: false, quantite: false, texte: t };
-    var per = lirePeriode(t), tr = lireTranche(t), m;
+    var per = lirePeriode(t.replace(/jours? de la semaine/g, "jours")), tr = lireTranche(t), m;
     q.pExplicite = !!per;
     q.p = per || plage(plus(aujourdhui(), -29), aujourdhui());
     if (q.intention === "jours") tr.jours = null;     // « par jour de la semaine » ne filtre pas un jour
@@ -179,8 +179,7 @@
     return p.dateStart === p.dateEnd ? App.dateLongue(p.dateStart).toLowerCase() : "du " + App.dateCourte(p.dateStart) + " au " + App.dateCourte(p.dateEnd);
   }
   function libelleContexte(q) {
-    var s = libelleDates(q.p);
-    if (!q.pExplicite) s += " (30 derniers jours par défaut)";
+    var s = (q.pExplicite ? "" : "30 derniers jours, ") + libelleDates(q.p);
     if (q.jours) s += ", " + q.jours.map(function (j) { return JOURS_NOMS[j] + "s"; }).join("/");
     if (q.h1 != null) s += ", de " + hm(q.h1) + " à " + hm(q.h2);
     return s;
@@ -248,7 +247,7 @@
     var tot = somme(o.valeurs), fmt = o.unite === "€" ? App.euro : App.entier;
     if (!o.labels.length || !tot) return vide(q);
     var type = q.type || o.typeDefaut;
-    var head = o.intro + " (" + libelleContexte(q) + ")";
+    var head = o.intro + ", " + libelleContexte(q);
     var lignes = o.labels.map(function (l, i) { return [l, o.unite === "€" ? App.euro(o.valeurs[i]) : App.entier(o.valeurs[i]), pctDe(o.valeurs[i], tot)]; });
     lignes.push(["Total", fmt(tot), "100 %"]);
     var csvLignes = o.labels.map(function (l, i) { return [l, o.unite === "€" ? App.montantCsv(o.valeurs[i]) : o.valeurs[i]]; });
@@ -380,7 +379,7 @@
       var type = q.type || (s.labels.length <= 14 && s.pas === "jour" ? "barres" : "courbe");
       var lignes = s.labels.map(function (l, i) { return [l, App.euro(s.valeurs[i])]; });
       return {
-        texte: "Chiffre d'affaires TTC : " + App.euro(r.totalSales) + " (" + libelleContexte(q) + "), soit " + App.euro(moy) + " par jour ouvert. Meilleur jour : " +
+        texte: "Chiffre d'affaires TTC, " + libelleContexte(q) + " : " + App.euro(r.totalSales) + ", soit " + App.euro(moy) + " par jour ouvert. Meilleur jour : " +
           App.dateLongue(best.date).toLowerCase() + " (" + App.euro(best.totalSales) + ").",
         kpis: kpisDe(r),
         graph: { type: type, labels: s.labels, valeurs: s.valeurs, fmt: App.euro, liste: false },
