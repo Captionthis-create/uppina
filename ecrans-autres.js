@@ -17,12 +17,60 @@
     section: null, fil: ["Accueil"],
     rendre: function (ctx, zone) {
       var et = ctx.etat, quand = et.quand || "today";
+      var meteo = A.meteoActif();
       D.getHomePage().then(function (h) {
-        var k = h[quand];
-        A.act.quand = function (v) { et.quand = v; ctx.rafraichir(); };
-        zone.innerHTML =
-          A.carte("Informations clés", A.kpis([["CA TTC", A.euro(k.turnover)], ["CA HT", A.euro(k.turnoverHT)], ["Nb. de couverts", A.entier(k.guestCount)], ["Couvert moyen", A.euro(k.averageGuest)]]),
-            { droite: A.segment("quand", [["yesterday", "Hier"], ["today", "Aujourd'hui"]], quand, A.act.quand) });
+        var n = h.jours.length, idx = quand === "today" ? n - 1 : n - 2;        var k = h.jours[idx], ref = h.jours[idx - 7], serie = h.jours.slice(idx - 13, idx + 1);
+        var d = new Date(k.date + "T12:00:00");
+        var nomJour = d.toLocaleDateString("fr-FR", { weekday: "long" });
+        var dateTxt = nomJour + " " + d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+        return Promise.all([meteo ? D.getWeatherDays({ dateStart: k.date, dateEnd: k.date }) : null, meteo ? A.meteo.carteBandeau() : ""]).then(function (res) {
+          A.act.quand = function (v) { et.quand = v; ctx.rafraichir(); };
+          var jm = res[0] && res[0].jours[0] && res[0].jours[0].tmax != null ? res[0].jours[0] : null;
+
+          // En-tête : salutation, date et météo du jour choisi
+          var meteoJour = jm ? '<div class="accueil-meteo"><span class="am-ico">' + A.meteo.icone(jm.code) + "</span><div><b>" + Math.round(jm.tmax) + "° / " + Math.round(jm.tmin) + "°</b>" +
+            '<div class="doux petit">' + E(A.meteo.libelle(jm.code)) + (jm.pluie ? " · " + String(Math.round(jm.pluie * 10) / 10).replace(".", ",") + " mm" : "") + "</div></div>" + A.meteo.pastille(jm.score) + "</div>" : "";
+          var tete = '<div class="carte accueil-tete"><div><h1>Bonjour,</h1><p>' + (quand === "today" ? "voici votre service du " : "voici le service d'hier, ") + "<b>" + E(dateTxt) + "</b></p></div>" + meteoJour +
+            A.segment("quand", [["yesterday", "Hier"], ["today", "Aujourd'hui"]], quand, A.act.quand) + "</div>";
+
+          // Tuiles : valeur, écart avec le même jour de la semaine précédente, courbe des 14 derniers jours
+          function pct(a, b) { return b ? Math.round((a - b) / b * 100) : null; }
+          function tuile(couleur, icone, libelle, cle, fmt) {
+            var v = k[cle], p = pct(v, ref[cle]);
+            var delta = p === null ? '<span class="doux">pas de comparaison</span>' :
+              '<span class="' + (p > 0 ? "delta-bon" : p < 0 ? "delta-mauvais" : "doux") + '">' + (p > 0 ? "▲ +" : p < 0 ? "▼ " : "= ") + String(p).replace("-", "−") + " %</span> <span class=\"doux\">vs " + E(nomJour) + " dernier</span>";
+            return '<div class="kpi tuile" style="--couleur:' + couleur + '"><div class="tuile-tete"><span class="tuile-ico">' + icone + '</span><div class="kpi-l">' + libelle + "</div></div>" +
+              '<div class="kpi-v">' + fmt(v) + '</div><div class="tuile-delta">' + delta + "</div>" + spark(serie.map(function (j) { return j[cle]; }), couleur) + "</div>";
+          }
+          function spark(vals, couleur) {
+            var max = Math.max.apply(null, vals) || 1, m = vals.length, pts = vals.map(function (v, i) { return [i * 100 / (m - 1), 28 - v / max * 24]; });
+            var l = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+            return '<svg class="spark" viewBox="0 0 100 32" preserveAspectRatio="none"><path d="' + l + " L100,32 L0,32 Z" + '" fill="' + couleur + '" fill-opacity="0.14"/><path d="' + l + '" fill="none" stroke="' + couleur + '" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>';
+          }
+          var ic = {
+            ttc: '<svg viewBox="0 0 24 24"><path d="M18 6.5A7 7 0 1018 17.5M4 10h10M4 14h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+            ht: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 10h16" stroke="currentColor" stroke-width="2"/></svg>',
+            cov: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M16 5a3 3 0 010 6M18 14c2 .7 3 2.8 3 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+            moy: '<svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>'
+          };
+          var tuiles = '<div class="kpis" style="--n:4">' + tuile("#d99a1e", ic.ttc, "CA TTC", "turnover", A.euro) + tuile("#3b7dd8", ic.ht, "CA HT", "turnoverHT", A.euro) +
+            tuile("#1f9d55", ic.cov, "Nb. de couverts", "guestCount", A.entier) + tuile("#8e5bd0", ic.moy, "Couvert moyen", "averageGuest", A.euro) + "</div>";
+
+          // Midi / soir
+          var totCa = k.midi.turnover + k.soir.turnover, totCov = k.midi.guestCount + k.soir.guestCount;
+          function part(v, t) { return t ? Math.round(v / t * 100) : 0; }
+          function moitie(nom, s, couleur, emoji) {
+            return '<div class="ms-bloc"><div class="ms-nom"><span>' + emoji + "</span>" + nom + "</div>" +
+              '<div class="ms-chiffre">' + A.euro(s.turnover) + '<span class="doux"> · ' + part(s.turnover, totCa) + " % du CA</span></div>" +
+              '<div class="ms-barre"><i style="width:' + part(s.turnover, totCa) + "%;background:" + couleur + '"></i></div>' +
+              '<div class="doux petit">' + A.entier(s.guestCount) + " couverts (" + part(s.guestCount, totCov) + " %)" + (s.guestCount ? " · " + A.euro(s.turnover / s.guestCount) + " par couvert" : "") + "</div></div>";
+          }
+          var service = A.carte("Midi / soir", totCa ? '<div class="ms-corps"><div class="ms-cumul"><i style="width:' + part(k.midi.turnover, totCa) + '%;background:#e8a33d"></i><i style="flex:1;background:#4a5fc1"></i></div>' +
+            '<div class="ms-deux">' + moitie("Midi", k.midi, "#e8a33d", "☀️") + moitie("Soir", k.soir, "#4a5fc1", "🌙") + "</div>" +
+            '<div class="doux petit">Midi : avant 16 h · Soir : à partir de 16 h</div></div>' : A.vide("Pas de vente ce jour-là"));
+
+          zone.innerHTML = tete + tuiles + service + res[1];
+        });
       });
     }
   });
