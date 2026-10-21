@@ -63,6 +63,90 @@
     }
   });
 
+  // ---------- Objectifs de CA et de couverts : plusieurs objectifs nommés, chacun sur sa période ----------
+  function pct(v, cible) { return cible > 0 ? v / cible * 100 : 0; }
+  function nbJours(a, b) { return Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 86400000) + 1; }
+  function dateCourte(iso) { return iso.slice(8) + "/" + iso.slice(5, 7) + "/" + iso.slice(2, 4); }
+  // Bloc de progression : barre (repère = part attendue à ce jour), réalisé, écart, projection, reste à faire
+  function blocObjectif(titre, realise, objectif, attendu, projection, fmt, resteParJour, etat) {
+    if (!(objectif > 0)) return "";
+    var p = pct(realise, objectif), att = pct(attendu, objectif), ecart = realise - attendu, bon = ecart >= 0, projP = pct(projection, objectif);
+    var detail = etat === "avenir" ? "" :
+      "<div><span>" + (etat === "fini" ? "Objectif" : "Attendu à ce jour") + "</span><b>" + fmt(etat === "fini" ? objectif : attendu) + "</b></div>" +
+      '<div><span>Écart</span><b class="' + (bon ? "vert" : "rouge") + '">' + (bon ? "+" : "-") + fmt(Math.abs(ecart)) + (bon ? " d'avance" : " de retard") + "</b></div>" +
+      (etat === "cours" ? '<div><span>Projection fin de période</span><b class="' + (projP >= 100 ? "vert" : "") + '">' + fmt(projection) + " (" + A.entier(Math.round(projP)) + " %)</b></div>" : "") +
+      (etat === "cours" && resteParJour != null ? "<div><span>Reste à faire par jour restant</span><b>" + fmt(resteParJour) + "</b></div>" : "");
+    return '<div class="obj-bloc"><h4>' + titre + '</h4><div class="obj-haut"><span class="obj-pct ' + (p >= 100 ? "vert" : "") + '">' + A.decimal(p) + " %</span><span class=\"doux\">" + fmt(realise) + " sur " + fmt(objectif) + "</span></div>" +
+      '<div class="obj-barre"><i class="' + (bon || etat === "avenir" ? "ok" : "ko") + '" style="width:' + Math.min(100, p) + '%"></i>' + (etat === "cours" ? '<b style="left:' + Math.min(100, att) + '%" title="Attendu à ce jour"></b>' : "") + "</div>" +
+      (detail ? '<div class="obj-detail">' + detail + "</div>" : "") + "</div>";
+  }
+  function carteObjectif(o, v, auj) {
+    var base = o.base === "ht" ? "HT" : "TTC";
+    if (base === "HT") v = { guestsNumber: v.guestsNumber, totalSales: v.totalSalesWithoutTaxes, reportFromPeriod: v.reportFromPeriod.map(function (j) { return { date: j.date, totalSales: j.totalSalesWithoutTaxes }; }) };
+    var jours = v.reportFromPeriod, total = nbJours(o.debut, o.fin);
+    var etat = o.fin < auj ? "fini" : o.debut > auj ? "avenir" : "cours";
+    var ecoules = etat === "fini" ? total : etat === "avenir" ? 0 : nbJours(o.debut, auj), restants = total - ecoules, part = ecoules / total;
+    var projCA = etat === "cours" && ecoules ? v.totalSales / part : v.totalSales, projCV = etat === "cours" && ecoules ? v.guestsNumber / part : v.guestsNumber;
+    var resteCA = restants > 0 && o.ca > v.totalSales ? (o.ca - v.totalSales) / restants : null;
+    var resteCV = restants > 0 && o.couverts > v.guestsNumber ? (o.couverts - v.guestsNumber) / restants : null;
+    var fmtCV = function (n) { return A.entier(Math.round(n)) + " couverts"; };
+    var cumul = 0, sr = [], so = [];
+    jours.forEach(function (j, i) { cumul += j.totalSales; sr.push(j.date <= auj ? cumul : null); so.push(o.ca * (i + 1) / total); });
+    var graphe = o.ca > 0 && etat !== "avenir" && jours.length > 1 ? A.graph.courbe({ labels: jours.map(function (j) { return +j.date.slice(8); }), lisse: false, hauteur: 220,
+      series: [{ nom: "Objectif", couleur: "#999", tirets: true, valeurs: so }, { nom: "Réalisé", couleur: "#111", valeurs: sr }] }) +
+      '<div class="legende"><span><i class="trait" style="background:#111"></i>CA ' + base + ' réalisé (cumulé)</span><span><i class="trait" style="background:#999"></i>Objectif (réparti sur la période)</span></div>' : "";
+    var statut = { cours: ["En cours", "ok"], avenir: ["À venir", ""], fini: [(o.ca ? v.totalSales >= o.ca : v.guestsNumber >= o.couverts) ? "Atteint" : "Non atteint", (o.ca ? v.totalSales >= o.ca : v.guestsNumber >= o.couverts) ? "ok" : "ko"] }[etat];
+    var droite = '<span class="badge-bon ' + statut[1] + '">' + statut[0] + "</span>" +
+      '<button class="bouton" data-act="obj-edit" data-val="' + E(o.id) + '">Modifier</button><button class="bouton" data-act="obj-del" data-val="' + E(o.id) + '">Supprimer</button>';
+    return A.carte(E(o.nom) + ' <span class="doux obj-periode">du ' + dateCourte(o.debut) + " au " + dateCourte(o.fin) + " · " + total + " jour" + (total > 1 ? "s" : "") + (etat === "cours" ? " (" + restants + " restant" + (restants > 1 ? "s" : "") + ")" : "") + "</span>",
+      '<div class="deux-col">' + blocObjectif("Chiffre d'affaires " + base, v.totalSales, o.ca, o.ca * part, projCA, A.euro, resteCA, etat) + blocObjectif("Couverts", v.guestsNumber, o.couverts, o.couverts * part, projCV, fmtCV, resteCV, etat) + "</div>" + graphe,
+      { droite: droite });
+  }
+  // Tiroir de création / modification
+  function formulaireObjectif(o, apres) {
+    var t = A.tiroir(""), mois = A.periodeMois(), suivant = A.decalerPeriode(mois, 1);
+    function val(id) { return document.getElementById(id).value; }
+    t.innerHTML = '<div class="tiroir-tete"><div><h3>' + (o.id ? "Modifier l'objectif" : "Nouvel objectif") + '</h3></div><button class="fermer" data-fermer>✕</button></div>' +
+      '<div class="tiroir-corps"><div class="stk-form">' +
+      '<label>Nom<input id="ob-nom" type="text" maxlength="60" placeholder="ex. Objectif été, Noël..."></label>' +
+      '<label>Début<input id="ob-debut" type="date"></label><label>Fin<input id="ob-fin" type="date"></label>' +
+      '<div class="segment"><button data-per="m">Ce mois-ci</button><button data-per="s">Mois prochain</button></div>' +
+      '<label>Le CA s\'entend en<select id="ob-base"><option value="ttc">TTC (toutes taxes comprises)</option><option value="ht">HT (hors taxes)</option></select></label>' +
+      '<label>Objectif de CA (€)<input id="ob-ca" type="number" min="0" step="100" inputmode="decimal" placeholder="ex. 40000"></label>' +
+      '<label>Objectif de couverts<input id="ob-cv" type="number" min="0" step="10" inputmode="numeric" placeholder="ex. 1500"></label>' +
+      '<p class="doux">Au moins un des deux. L\'objectif est réparti au prorata des jours de la période.</p><div class="stk-erreur" id="ob-err"></div></div></div>' +
+      '<div class="tiroir-pied"><button class="bouton" data-fermer>Annuler</button><span class="td-espace"></span><button class="bouton sombre" data-valider>Enregistrer</button></div>';
+    document.getElementById("ob-nom").value = o.nom || ""; document.getElementById("ob-debut").value = o.debut || mois.dateStart; document.getElementById("ob-fin").value = o.fin || mois.dateEnd;
+    document.getElementById("ob-base").value = o.base === "ht" ? "ht" : "ttc"; document.getElementById("ob-ca").value = o.ca || ""; document.getElementById("ob-cv").value = o.couverts || "";
+    t.addEventListener("click", function (e) {
+      var c = e.target.closest("[data-per],[data-fermer],[data-valider]");
+      if (!c) return;
+      if (c.hasAttribute("data-fermer")) A.fermerTiroir();
+      else if (c.hasAttribute("data-per")) { var p = c.getAttribute("data-per") === "m" ? mois : suivant; document.getElementById("ob-debut").value = p.dateStart; document.getElementById("ob-fin").value = p.dateEnd; }
+      else D.setObjectif({ id: o.id, nom: val("ob-nom"), debut: val("ob-debut"), fin: val("ob-fin"), base: val("ob-base"), ca: val("ob-ca"), couverts: val("ob-cv") })
+        .then(function () { A.fermerTiroir(); A.info("Objectif enregistré."); apres(); }, function (msg) { document.getElementById("ob-err").textContent = String(msg); });
+    });
+  }
+  A.ecran("/reports/objectifs", {
+    section: "rapports", fil: ["Objectifs"],
+    actions: function () { return A.bouton("Nouvel objectif", "obj-new", { classe: "sombre" }); },
+    filtres: ["sites"],
+    rendre: function (ctx, zone) {
+      D.getObjectifs().then(function (liste) {
+        A.act["obj-new"] = function () { formulaireObjectif({}, ctx.rafraichir); };
+        A.act["obj-edit"] = function (id) { formulaireObjectif(liste.filter(function (x) { return x.id === id; })[0], ctx.rafraichir); };
+        A.act["obj-del"] = function (id) {
+          var o = liste.filter(function (x) { return x.id === id; })[0];
+          if (window.confirm("Supprimer l'objectif « " + o.nom + " » ?")) D.deleteObjectif(id).then(function () { A.info("Objectif supprimé."); ctx.rafraichir(); }, A.info);
+        };
+        if (!liste.length) { zone.innerHTML = A.vide("Aucun objectif") + '<p class="doux obj-note" style="text-align:center">Cliquez sur « Nouvel objectif » pour fixer un objectif de CA et/ou de couverts sur la période de votre choix. Vous pouvez en créer plusieurs.</p>'; return; }
+        var p0 = ctx.periode, auj = A.aujourdhui();
+        Promise.all(liste.map(function (o) { var p = {}; Object.keys(p0).forEach(function (k) { p[k] = p0[k]; }); p.dateStart = o.debut; p.dateEnd = o.fin; return D.getReportTotalSales(p); })).then(function (res) {
+          zone.innerHTML = liste.map(function (o, i) { return carteObjectif(o, res[i], auj); }).join("");
+        });
+      });
+    }
+  });
   // ---------- Caisses en cours ----------
   A.ecran("/reports/tills-in-progress", {
     section: "rapports", fil: ["Caisses en cours"],
