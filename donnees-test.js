@@ -500,20 +500,39 @@
       .sort(function (a, b) { return b.totalSalesOwner - a.totalSalesOwner; }));
   }
 
-  // ---- Objectifs de CA / couverts : saisis par l'utilisateur, par mois, gardés dans le navigateur ----
-  var CLE_OBJECTIFS = "objectifs-copie";
+  // ---- Objectifs de CA / couverts : plusieurs objectifs nommés, chacun sur sa période, gardés dans le navigateur ----
+  var CLE_OBJECTIFS = "objectifs-liste";
   function lireObjectifs() {
-    try { return JSON.parse(localStorage.getItem(CLE_OBJECTIFS) || "{}") || {}; } catch (e) { return {}; }
+    try {
+      var l = JSON.parse(localStorage.getItem(CLE_OBJECTIFS) || "null");
+      if (l) return l;
+      // Reprise de l'ancienne version (un objectif par mois)
+      var vieux = JSON.parse(localStorage.getItem("objectifs-copie") || "{}") || {};
+      return Object.keys(vieux).sort().map(function (m) {
+        var fin = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
+        return { id: "m" + m, nom: "Objectif " + m.slice(5) + "/" + m.slice(0, 4), debut: m + "-01", fin: m + "-" + (fin < 10 ? "0" : "") + fin, ca: vieux[m].ca || 0, couverts: vieux[m].couverts || 0 };
+      });
+    } catch (e) { return []; }
   }
-  function getObjectifs() { return reponse(lireObjectifs()); }
-  // mois = "AAAA-MM" ; obj = { ca, couverts } (0 ou vide = pas d'objectif) ; null efface le mois
-  function setObjectif(mois, obj) {
-    var tous = lireObjectifs(), ca = obj ? Math.max(0, +obj.ca || 0) : 0, cv = obj ? Math.max(0, Math.round(+obj.couverts || 0)) : 0;
-    if (ca || cv) tous[mois] = { ca: ca, couverts: cv }; else delete tous[mois];
-    try { localStorage.setItem(CLE_OBJECTIFS, JSON.stringify(tous)); } catch (e) { return Promise.reject("Stockage du navigateur indisponible."); }
-    return reponse(tous);
+  function sauverObjectifs(l) {
+    try { localStorage.setItem(CLE_OBJECTIFS, JSON.stringify(l)); return true; } catch (e) { return false; }
   }
-
+  function getObjectifs() { return reponse(lireObjectifs().sort(function (a, b) { return a.debut < b.debut ? -1 : a.debut > b.debut ? 1 : 0; })); }
+  // o = { id (absent = création), nom, debut, fin, ca, couverts } ; refuse si incohérent
+  function setObjectif(o) {
+    var nom = String(o.nom || "").trim(), ca = Math.max(0, +o.ca || 0), cv = Math.max(0, Math.round(+o.couverts || 0));
+    if (!nom) return Promise.reject("Donnez un nom à l'objectif.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(o.debut || "") || !/^\d{4}-\d{2}-\d{2}$/.test(o.fin || "")) return Promise.reject("Renseignez les dates de début et de fin.");
+    if (o.fin < o.debut) return Promise.reject("La date de fin précède la date de début.");
+    if (!ca && !cv) return Promise.reject("Saisissez un objectif de CA et/ou de couverts.");
+    var l = lireObjectifs(), n = { id: o.id || "o" + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), nom: nom, debut: o.debut, fin: o.fin, base: o.base === "ht" ? "ht" : "ttc", ca: ca, couverts: cv }, trouve = false;
+    l = l.map(function (x) { if (x.id === n.id) { trouve = true; return n; } return x; });
+    if (!trouve) l.push(n);
+    return sauverObjectifs(l) ? reponse(n) : Promise.reject("Stockage du navigateur indisponible.");
+  }
+  function deleteObjectif(id) {
+    return sauverObjectifs(lireObjectifs().filter(function (x) { return x.id !== id; })) ? reponse(true) : Promise.reject("Stockage du navigateur indisponible.");
+  }
   function getRealTime() {
     // Aucune caisse ouverte (comme sur la capture : « Aucune donnée disponible »)
     return reponse({ realTimeData: { totalSales: 0, guestsNumber: 0, orderCount: 0, totalCanceled: 0, totalByHours: [] }, lastWeekData: { totalByHours: [] } });
@@ -1333,7 +1352,7 @@
     getLocations: function () { return reponse(SITES); },
     getHomePage: getHomePage, getOrders: getOrders, getOrderById: getOrderById,
     getReportTotalSales: getReportTotalSales, getReportProductsAndCategories: getReportProductsAndCategories,
-    getReportClerkShifts: getReportClerkShifts, getObjectifs: getObjectifs, setObjectif: setObjectif, getRealTime: getRealTime, getHybridStock: getHybridStock, getAlertesStock: getAlertesStock,
+    getReportClerkShifts: getReportClerkShifts, getObjectifs: getObjectifs, setObjectif: setObjectif, deleteObjectif: deleteObjectif, getRealTime: getRealTime, getHybridStock: getHybridStock, getAlertesStock: getAlertesStock,
     getStockMovements: getStockMovements, setStockMovement: setStockMovement, MOTIFS_PERTE: MOTIFS_PERTE,
     getReportProductData: getReportProductData, getReportModifiers: getReportModifiers, getEmployees: getEmployees,
     getReportCancelation: getReportCancelation, getReportLosses: getReportLosses, getReportDiscount: getReportDiscount,
