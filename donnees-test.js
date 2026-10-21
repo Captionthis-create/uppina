@@ -390,21 +390,17 @@
   // ======================================================================
   function getHomePage() {
     var jours = [], i;
-    for (i = 11; i >= 0; i--) {
-      var d = jourIso(new Date(AUJ.getTime() - i * 86400000));
-      jours.push({ date: d, amount: totaux(payees({ dateStart: d, dateEnd: d })).ttc });
+    // 22 jours (le jour choisi, 7 jours avant pour la comparaison et 14 jours de courbe) ; midi = avant 16 h, soir = après
+    function service(iso, h1, h2) {
+      var t = totaux(payees({ dateStart: iso, dateEnd: iso, h1: h1, h2: h2 }));
+      return { turnover: t.ttc, guestCount: t.couverts };
     }
-    function jour(iso) {
-      var cm = payees({ dateStart: iso, dateEnd: iso }), t = totaux(cm);
-      var ann = 0;
-      commandesDe({ dateStart: iso, dateEnd: iso }).forEach(function (c) { c.annules.forEach(function (a) { ann += a.prix * a.q; }); });
-      return { turnover: t.ttc, turnoverHT: t.ht, guestCount: t.couverts, averageGuest: t.couverts ? arrondi(t.ttc / t.couverts) : 0, averageOrder: cm.length ? arrondi(t.ttc / cm.length) : 0, orderCount: cm.length, cancellationAmount: arrondi(ann) };
+    for (i = 21; i >= 0; i--) {
+      var iso = jourIso(new Date(AUJ.getFullYear(), AUJ.getMonth(), AUJ.getDate() - i)), t = totaux(payees({ dateStart: iso, dateEnd: iso }));
+      jours.push({ date: iso, turnover: t.ttc, turnoverHT: t.ht, guestCount: t.couverts, averageGuest: t.couverts ? arrondi(t.ttc / t.couverts) : 0,
+        midi: service(iso, 0, 960), soir: service(iso, 960, 1440) });
     }
-    return reponse({
-      dailyTurnover: jours,
-      today: jour(AUJ_ISO),
-      yesterday: jour(jourIso(new Date(AUJ.getTime() - 86400000)))
-    });
+    return reponse({ jours: jours });
   }
 
   function getOrders(f) {

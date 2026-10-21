@@ -543,6 +543,34 @@ body { overflow-x: hidden; }
 .meteo-ligne { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
 .meteo-ligne b { font-weight: 600; }
 
+/* ---------- Accueil ---------- */
+.accueil-tete { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; padding: 20px 28px; margin-bottom: 16px; border-left: 4px solid #d99a1e; }
+.accueil-tete > div:first-child { flex: 1; min-width: 220px; }
+.accueil-tete h1 { margin: 0 0 4px; font-size: 24px; font-weight: 600; }
+.accueil-tete p { margin: 0; font-size: 14px; color: var(--texte-doux); }
+.accueil-tete p b { color: var(--texte); }
+.accueil-meteo { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 1px solid var(--bordure); border-radius: 10px; }
+.am-ico { font-size: 30px; line-height: 1; }
+.tuile { position: relative; overflow: hidden; border-top: 3px solid var(--couleur); }
+.tuile-tete { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.tuile-tete .kpi-l { margin: 0; }
+.tuile-ico { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--couleur); background: color-mix(in srgb, var(--couleur) 14%, transparent); }
+.tuile-ico svg { width: 18px; height: 18px; }
+.tuile .kpi-v { font-size: 30px; }
+.tuile-delta { font-size: 12px; margin: 4px 0 8px; min-height: 16px; }
+.spark { display: block; width: 100%; height: 36px; }
+.ms-corps { padding: 4px 20px 16px; }
+.ms-cumul { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin-bottom: 18px; }
+.ms-cumul i { display: block; }
+.ms-deux { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 12px; }
+.ms-nom { font-weight: 600; margin-bottom: 4px; }
+.ms-nom span { margin-right: 6px; }
+.ms-chiffre { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+.ms-chiffre .doux { font-size: 12px; font-weight: 400; }
+.ms-barre { height: 8px; border-radius: 4px; background: var(--bordure); overflow: hidden; margin-bottom: 8px; }
+.ms-barre i { display: block; height: 100%; border-radius: 4px; }
+@media (max-width: 700px) { .ms-deux { grid-template-columns: 1fr; } .accueil-tete { padding: 16px; } }
+
 /* ---- Formulaire produit et prix d'achat ---- */
 .pf { padding: 0; max-width: 900px; margin: 0 auto; }
 .pf-titre { font-size: 18px; margin: 0; padding: 22px 28px; border-bottom: 1px solid var(--bordure); }
