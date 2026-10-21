@@ -19,17 +19,10 @@
       var et = ctx.etat, quand = et.quand || "today";
       D.getHomePage().then(function (h) {
         var k = h[quand];
-        var illustration = '<svg viewBox="0 0 160 110" class="illustration"><rect x="8" y="10" width="80" height="92" rx="6" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="26" r="6" fill="currentColor"/>' +
-          '<path d="M20 44h56M20 54h40M20 64h48M20 74h36" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="72" y="36" width="76" height="52" rx="5" style="fill:var(--carte)" stroke="currentColor" stroke-width="2"/>' +
-          '<path d="M80 50h40M80 60h50M80 70h30" stroke="#999" stroke-width="3" stroke-linecap="round"/><circle cx="118" cy="82" r="11" fill="currentColor"/><path d="M112 82l4 4 8-8" style="stroke:var(--carte)" stroke-width="2.4" fill="none"/></svg>';
-        A.act.bandeau = A.nonDispo;
         A.act.quand = function (v) { et.quand = v; ctx.rafraichir(); };
         zone.innerHTML =
-          '<div class="carte"><div class="campagne">' + illustration + '<div><h2>Découvrez les nouveautés du mois !</h2><p>Bandeau de démonstration : cette zone affiche une campagne d\'information inventée pour la maquette. Aucune donnée réelle n\'est utilisée.</p>' +
-          '<button class="bouton sombre" data-act="bandeau">En savoir plus !</button></div></div></div>' +
-          A.carte("Informations clés", A.kpis([["Chiffre d'affaires", A.euro(k.turnover)], ["Commande moyenne", A.euro(k.averageOrder)], ["Nb. de commandes", A.entier(k.orderCount)], ["Montant des annulations", A.euro(k.cancellationAmount)]]),
-            { droite: A.segment("quand", [["yesterday", "Hier"], ["today", "Aujourd'hui"]], quand, A.act.quand) }) +
-          A.carte("Chiffre d'affaires journalier", A.graph.barres({ labels: h.dailyTurnover.map(function (j) { return +j.date.slice(8); }), valeurs: h.dailyTurnover.map(function (j) { return j.amount; }), hauteur: 320 }));
+          A.carte("Informations clés", A.kpis([["CA TTC", A.euro(k.turnover)], ["CA HT", A.euro(k.turnoverHT)], ["Nb. de couverts", A.entier(k.guestCount)], ["Couvert moyen", A.euro(k.averageGuest)]]),
+            { droite: A.segment("quand", [["yesterday", "Hier"], ["today", "Aujourd'hui"]], quand, A.act.quand) });
       });
     }
   });

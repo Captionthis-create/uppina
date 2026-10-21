@@ -398,7 +398,7 @@
       var cm = payees({ dateStart: iso, dateEnd: iso }), t = totaux(cm);
       var ann = 0;
       commandesDe({ dateStart: iso, dateEnd: iso }).forEach(function (c) { c.annules.forEach(function (a) { ann += a.prix * a.q; }); });
-      return { turnover: t.ttc, averageOrder: cm.length ? arrondi(t.ttc / cm.length) : 0, orderCount: cm.length, cancellationAmount: arrondi(ann) };
+      return { turnover: t.ttc, turnoverHT: t.ht, guestCount: t.couverts, averageGuest: t.couverts ? arrondi(t.ttc / t.couverts) : 0, averageOrder: cm.length ? arrondi(t.ttc / cm.length) : 0, orderCount: cm.length, cancellationAmount: arrondi(ann) };
     }
     return reponse({
       dailyTurnover: jours,
