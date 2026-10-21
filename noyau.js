@@ -638,7 +638,7 @@
   var reglagesPdv = [
     ["Imprimantes", "printers"], ["Postes de préparation", "prepa-stations"], ["Types de prix", "price-types"], ["Taxes", "taxes"],
     ["Remises", "discounts"], ["Mouvements de caisse", "cash-movements"], ["Ticket de caisse", "receipt"], ["Modes de paiement", "payments"],
-    ["Réglages divers", "misc-settings"], ["Appareils et Contrats", "devices-contracts"]
+    ["Créneaux de service", "service-slots"], ["Réglages divers", "misc-settings"], ["Appareils et Contrats", "devices-contracts"]
   ].map(function (x) { return { label: x[0], route: "/point-of-sale/settings/" + x[1] }; });
 
   var SECTIONS = {
