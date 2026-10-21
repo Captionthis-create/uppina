@@ -945,16 +945,22 @@
   }
   // d = champs saisis ; id null = création. Rejette avec un message si invalide.
   function setProduct(id, d) {
+    var r = ecrireProduit(id, d);
+    return r.erreur ? Promise.reject(r.erreur) : getProduct(r.id);
+  }
+  // Noyau synchrone : renvoie { id } ou { erreur }
+  function ecrireProduit(id, d) {
+    function rejet(m) { return { erreur: m }; }
     initEdits();
     var nom = String(d.nom || "").trim(), prix = Math.round(+d.prix * 100) / 100, tva = +d.tva;
     var achat = d.achat === null || d.achat === "" || d.achat === undefined ? null : Math.round(+d.achat * 10000) / 10000;
-    if (!nom) return Promise.reject("Le nom est obligatoire.");
-    if (!d.categorie) return Promise.reject("Choisir une catégorie.");
-    if (!isFinite(prix) || prix < 0) return Promise.reject("Prix invalide.");
-    if (!isFinite(tva)) return Promise.reject("Choisir la TVA.");
-    if (achat !== null && (!isFinite(achat) || achat < 0)) return Promise.reject("Prix d'achat invalide.");
+    if (!nom) return rejet("Le nom est obligatoire.");
+    if (!d.categorie) return rejet("Choisir une catégorie.");
+    if (!isFinite(prix) || prix < 0) return rejet("Prix invalide.");
+    if (!isFinite(tva)) return rejet("Choisir la TVA.");
+    if (achat !== null && (!isFinite(achat) || achat < 0)) return rejet("Prix d'achat invalide.");
     var seuil = d.seuilReappro === null || d.seuilReappro === "" || d.seuilReappro === undefined ? null : Math.round(+d.seuilReappro * 100) / 100;
-    if (seuil !== null && (!isFinite(seuil) || seuil < 0)) return Promise.reject("Seuil de réapprovisionnement invalide.");
+    if (seuil !== null && (!isFinite(seuil) || seuil < 0)) return rejet("Seuil de réapprovisionnement invalide.");
     var val = { nom: nom, categorie: d.categorie, sousCategorie: d.sousCategorie || "", poles: d.poles || [], niveau: d.niveau || "Aucun", options: d.options || [],
       typePrix: d.typePrix || "unitaire", prix: prix, tva: tva, achat: achat, codeBarre: String(d.codeBarre || "").trim(), sku: String(d.sku || "").trim(),
       plu: String(d.plu || "").trim(), nomBouton: String(d.nomBouton || "").trim(), nomPrepa: String(d.nomPrepa || "").trim(), seuilReappro: seuil };
@@ -962,9 +968,36 @@
     if (!id) { val.id = "n" + Date.now(); EDITS.ajouts.push(val); id = val.id; }
     else if (ajout) { val.id = id; EDITS.ajouts[EDITS.ajouts.indexOf(ajout)] = val; }
     else if (PRODUITS.some(function (p) { return p.id === id; })) EDITS.modifs[id] = val;
-    else return Promise.reject("Produit introuvable.");
-    if (!sauverEdits()) return Promise.reject("Stockage du navigateur indisponible.");
-    return getProduct(id);
+    else return rejet("Produit introuvable.");
+    if (!sauverEdits()) return rejet("Stockage du navigateur indisponible.");
+    return { id: id };
+  }
+  // Modification en lot. ids = produits ; lot = { champ: valeur } pour les champs simples (categorie, sousCategorie, niveau, typePrix, tva, seuilReappro)
+  // et { poles|options: { mode: "remplacer"|"ajouter"|"retirer", valeurs:[...] } } pour les listes. Tout ou rien : un produit invalide annule le lot.
+  function setProductsLot(ids, lot) {
+    initEdits();
+    var avant = JSON.stringify(EDITS), tous = tousProduits(), erreur = null, n = 0;
+    ids.forEach(function (id) {
+      if (erreur) return;
+      var p = tous.filter(function (x) { return x.id === id; })[0];
+      if (!p) return;
+      var d = JSON.parse(JSON.stringify(p));
+      Object.keys(lot).forEach(function (k) {
+        var v = lot[k];
+        if (k === "poles" || k === "options") {
+          var cur = d[k] || [];
+          if (v.mode === "remplacer") cur = v.valeurs.slice();
+          else if (v.mode === "ajouter") v.valeurs.forEach(function (x) { if (cur.indexOf(x) < 0) cur.push(x); });
+          else cur = cur.filter(function (x) { return v.valeurs.indexOf(x) < 0; });
+          d[k] = cur;
+        } else d[k] = v;
+        if (k === "categorie" && !("sousCategorie" in lot)) d.sousCategorie = "";
+      });
+      var r = ecrireProduit(id, d);
+      if (r.erreur) erreur = p.nom + " : " + r.erreur; else n++;
+    });
+    if (erreur) { EDITS = JSON.parse(avant); sauverEdits(); return Promise.reject(erreur); }
+    return reponse(n);
   }
   // Supprime un produit créé, ou rétablit un produit d'origine modifié
   function resetProduct(id) {
@@ -1359,7 +1392,7 @@
     getReportTaxes: getReportTaxes, getReportPaymentMode: getReportPaymentMode, getReportCategories: getReportCategories,
     getSalesDistribution: getSalesDistribution, getCreneaux: getCreneaux, setCreneaux: setCreneaux, creneauxDefaut: CRENEAUX_DEFAUT, getReportMenuSales: getReportMenuSales, getNewHistoryZTill: getNewHistoryZTill,
     getReportById: getReportById, getFiscalArchives: getFiscalArchives, getRoomsReport: getRoomsReport,
-    getProduct: getProduct, setProduct: setProduct, resetProduct: resetProduct, getGestionAchat: getGestionAchat, setGestionAchat: setGestionAchat, calculMarge: calculMarge,
+    getProduct: getProduct, setProduct: setProduct, setProductsLot: setProductsLot, resetProduct: resetProduct, getGestionAchat: getGestionAchat, setGestionAchat: setGestionAchat, calculMarge: calculMarge,
     getCatalogue: getCatalogue, getAllModifierGroups: getAllModifierGroups, getAllMeals: getAllMeals, getEmployeesPos: getEmployeesPos,
     getRooms: getRooms, getPrintersList: getPrintersList, getAllPreparationStations: getAllPreparationStations,
     getPricingList: getPricingList, getAllTaxes: getAllTaxes, getDiscounts: getDiscounts, getCashMovementReasons: getCashMovementReasons,

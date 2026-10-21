@@ -32,12 +32,21 @@
     actions: function () { A.act.creer = function () { A.allerA(CHEMIN_PRODUITS + "/create"); }; return exportCsv() + A.bouton("Ajouter un produit", "creer", { classe: "sombre" }); },
     rendre: function (ctx, zone) {
       var et = ctx.etat;
-      Promise.all([D.getCatalogue(), D.getGestionAchat()]).then(function (r) {
+      Promise.all([D.getCatalogue(), D.getGestionAchat(), D.getAllModifierGroups()]).then(function (r) {
         var c = r[0], achat = r[1];
+        c.groupes = r[2].map(function (g) { return g.nom; });
         A.act["achat-bascule"] = function () { D.setGestionAchat(!achat).then(function () { ctx.rafraichir(); }); };
         var lignes = c.produits.filter(function (p) {
           return (!et.cat || p.categorie === et.cat) && (!et.sous || p.sousCategorie === et.sous) && (!et.pole || p.poles.indexOf(et.pole) >= 0) && (!et.tva || ("TVA " + p.tva) === et.tva);
         });
+        // Sélection multiple : on ne garde que les produits encore affichés après un changement de filtre
+        var sel = et.sel = et.sel || {}, visibles = {};
+        lignes.forEach(function (p) { visibles[p.id] = p; });
+        Object.keys(sel).forEach(function (k) { if (!visibles[k]) delete sel[k]; });
+        A.act.lot = function () {
+          var ids = Object.keys(sel);
+          if (ids.length) tiroirLot(c, ids, visibles, function () { ctx.rafraichir(); });
+        };
         A.act.export = function () {
           A.telechargerCsv("produits.csv", ["Nom", "Catégorie", "Sous-catégorie", "Prix", "TVA"].concat(achat ? ["Prix d'achat HT", "Marge HT", "Taux de marque"] : []), lignes.map(function (p) {
             var m = D.calculMarge(p.prix, p.tva, p.achat);
@@ -67,12 +76,92 @@
               { t: "Taux de marque", a: "d", f: function (p) { var m = D.calculMarge(p.prix, p.tva, p.achat); return m ? pct(m.taux) : "-"; },
                 tri: function (p) { var m = D.calculMarge(p.prix, p.tva, p.achat); return m && m.taux !== null ? m.taux : -1e9; } }]),
           lignes: lignes, rech: { ph: "Rechercher un article", texte: function (p) { return p.nom; } }, filtres: filtres, pageSize: 20,
+          selection: { sel: sel, id: function (p) { return p.id; }, actions: '<button class="bouton sombre" data-act="lot">Modifier la sélection</button>' },
           onLigne: function (p) { A.allerA(CHEMIN_PRODUITS + "/edit/" + encodeURIComponent(p.id)); },
           droite: '<button class="bouton bascule' + (achat ? " actif" : "") + '" data-act="achat-bascule" title="Active la saisie du prix d\'achat et le calcul de marge"><i class="interrupteur"></i> Prix d\'achat</button>'
         });
       });
     }
   });
+
+  // ---------- Modification en lot (produits cochés dans la liste) ----------
+  // Chaque réglage a une case « Modifier » : seuls les réglages cochés sont appliqués à tous les produits choisis.
+  function tiroirLot(cat, ids, produits, apres) {
+    var o = { cat: false, sous: false, poles: false, niveau: false, options: false, typePrix: false, tva: false, seuil: false };
+    var v = { cat: "", sous: "", poles: [], modePoles: "remplacer", niveau: "Aucun", options: [], modeOptions: "remplacer", typePrix: "unitaire", tva: 10, seuil: "" };
+    var erreur = "";
+    var t = A.tiroir("");
+    function aff(cle) { return o[cle] ? "" : " masque"; }
+    function bloc(cle, titre, contenu) {
+      return '<div class="lot-bloc"><label class="lot-tete"><input type="checkbox" data-lot="' + cle + '"' + (o[cle] ? " checked" : "") + "> " + titre + '</label><div class="lot-champ' + aff(cle) + '">' + contenu + "</div></div>";
+    }
+    function puces(liste, choisis, cle) {
+      return '<div class="pf-puces">' + liste.map(function (x) {
+        return '<button type="button" class="pf-puce' + (choisis.indexOf(x) >= 0 ? " actif" : "") + '" data-puce="' + cle + '" data-val="' + E(x) + '">' + E(x) + "</button>";
+      }).join("") + "</div>";
+    }
+    function modes(cle, courant) {
+      return '<div class="segment">' + [["remplacer", "Remplacer"], ["ajouter", "Ajouter"], ["retirer", "Retirer"]].map(function (m) {
+        return '<button type="button" class="' + (m[0] === courant ? "actif" : "") + '" data-mode="' + cle + '" data-val="' + m[0] + '">' + m[1] + "</button>";
+      }).join("") + "</div>";
+    }
+    function opt(liste, valeur) {
+      return liste.map(function (x) { return '<option value="' + E(x[0]) + '"' + (String(x[0]) === String(valeur) ? " selected" : "") + ">" + E(x[1]) + "</option>"; }).join("");
+    }
+    function sousListe() { var c = cat.categories.filter(function (x) { return x.nom === v.cat; })[0]; return c ? c.sous : []; }
+    function nbModifs() { return Object.keys(o).filter(function (k) { return o[k]; }).length; }
+    function dessiner() {
+      var noms = ids.slice(0, 4).map(function (i) { return produits[i].nom; });
+      var groupes = {};
+      ids.forEach(function (i) { (groupes[produits[i].categorie] = groupes[produits[i].categorie] || []).push(i); });
+      t.innerHTML = '<div class="tiroir-tete"><div><h3>Modifier ' + ids.length + (ids.length > 1 ? " produits" : " produit") + '</h3><div class="doux">' + E(noms.join(", ")) + (ids.length > 4 ? "…" : "") +
+        '</div></div><button class="fermer" data-act="fermer-tiroir">✕</button></div><div class="tiroir-corps">' +
+        '<p class="doux">Cochez les réglages à changer : ils seront appliqués à tous les produits sélectionnés. Les autres restent inchangés.</p>' +
+        bloc("cat", "Catégorie", '<select class="pf-in" data-k="cat"><option value="">Sélectionnez une catégorie</option>' + opt(cat.categories.map(function (x) { return [x.nom, x.nom]; }), v.cat) + "</select>") +
+        bloc("sous", "Sous-catégorie", '<select class="pf-in" data-k="sous"><option value="">Aucune</option>' + opt(sousListe().map(function (x) { return [x, x]; }), v.sous) + "</select>" +
+          (o.cat ? "" : '<span class="doux pf-aide">Doit exister dans la catégorie de chaque produit.</span>')) +
+        bloc("poles", "Pôles de préparation", modes("modePoles", v.modePoles) + puces(cat.poles, v.poles, "poles")) +
+        bloc("niveau", "Niveau de suite", '<div class="pf-puces">' + NIVEAUX.map(function (n) { return '<button type="button" class="pf-puce' + (n === v.niveau ? " actif" : "") + '" data-niveau="' + n + '">' + n + "</button>"; }).join("") + "</div>") +
+        bloc("options", "Options", modes("modeOptions", v.modeOptions) + puces(cat.groupes, v.options, "options")) +
+        bloc("typePrix", "Type de prix", '<div class="segment">' + TYPES_PRIX.map(function (x) { return '<button type="button" class="' + (x[0] === v.typePrix ? "actif" : "") + '" data-typeprix="' + x[0] + '">' + x[1] + "</button>"; }).join("") + "</div>") +
+        bloc("tva", "TVA", '<select class="pf-in pf-tva" data-k="tva">' + opt(TAUX_TVA.map(function (x) { return [x, "TVA " + String(x).replace(".", ",") + "%"]; }), v.tva) + "</select>") +
+        bloc("seuil", "Seuil de réapprovisionnement", '<div class="pf-prix"><input class="pf-in" data-k="seuil" inputmode="decimal" placeholder="Aucun" value="' + E(v.seuil) + '"><span class="pf-unite">unités</span></div>') +
+        '<div class="pf-erreur" id="lot-erreur">' + E(erreur) + "</div></div>" +
+        '<div class="tiroir-pied"><button type="button" class="bouton" data-act="fermer-tiroir">Annuler</button><button type="button" class="bouton sombre" data-appliquer' + (nbModifs() ? "" : " disabled") + ">Appliquer à " + ids.length + (ids.length > 1 ? " produits" : " produit") + "</button></div>";
+    }
+    function basculer(liste, x) { var i = liste.indexOf(x); if (i >= 0) liste.splice(i, 1); else liste.push(x); }
+    function nombre(s) { var n = parseFloat(String(s).replace(",", ".")); return String(s).trim() === "" || !isFinite(n) ? null : n; }
+    t.addEventListener("change", function (e) {
+      var l = e.target.getAttribute("data-lot");
+      if (l) { o[l] = e.target.checked; if (l === "cat" && !o.cat) { /* la sous-catégorie reste libre */ } dessiner(); }
+      else if (e.target.getAttribute("data-k") === "cat") { v.cat = e.target.value; v.sous = ""; dessiner(); }
+      else if (e.target.getAttribute("data-k") === "sous") v.sous = e.target.value;
+      else if (e.target.getAttribute("data-k") === "tva") v.tva = +e.target.value;
+    });
+    t.addEventListener("input", function (e) { if (e.target.getAttribute("data-k") === "seuil") v.seuil = e.target.value; });
+    t.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-puce],[data-mode],[data-niveau],[data-typeprix],[data-appliquer]");
+      if (!b || b.disabled) return;
+      if (b.hasAttribute("data-puce")) { basculer(v[b.getAttribute("data-puce")], b.getAttribute("data-val")); dessiner(); }
+      else if (b.hasAttribute("data-mode")) { v[b.getAttribute("data-mode")] = b.getAttribute("data-val"); dessiner(); }
+      else if (b.hasAttribute("data-niveau")) { v.niveau = b.getAttribute("data-niveau"); dessiner(); }
+      else if (b.hasAttribute("data-typeprix")) { v.typePrix = b.getAttribute("data-typeprix"); dessiner(); }
+      else {
+        var lot = {};
+        if (o.cat) { if (!v.cat) { erreur = "Choisir une catégorie."; dessiner(); return; } lot.categorie = v.cat; }
+        if (o.sous) lot.sousCategorie = v.sous;
+        if (o.poles) lot.poles = { mode: v.modePoles, valeurs: v.poles };
+        if (o.niveau) lot.niveau = v.niveau;
+        if (o.options) lot.options = { mode: v.modeOptions, valeurs: v.options };
+        if (o.typePrix) lot.typePrix = v.typePrix;
+        if (o.tva) lot.tva = v.tva;
+        if (o.seuil) { lot.seuilReappro = nombre(v.seuil); }
+        D.setProductsLot(ids, lot).then(function (n) { A.fermerTiroir(); A.info(n + (n > 1 ? " produits modifiés." : " produit modifié.")); apres(); },
+          function (msg) { erreur = String(msg); dessiner(); });
+      }
+    });
+    dessiner();
+  }
 
   // ---------- Formulaire produit (création et modification) ----------
   var ONGLETS_PRODUIT = [["gen", "Générales"], ["tarifs", "Tarifs"], ["refs", "Références"], ["lib", "Libellés"]];

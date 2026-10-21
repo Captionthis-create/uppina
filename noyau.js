@@ -425,8 +425,22 @@
       (cfg.sansColonnes ? "" : '<div class="menu-conteneur"><button class="bouton" data-ouvre="' + id + '">' + App.icones.filtres + ' Colonnes</button>' +
         '<div class="menu-flottant droite" id="menu-' + id + '">' +
         cfg.colonnes.map(function (c, i) { return '<button class="choix" data-col="' + i + '">' + E(c.t) + "</button>"; }).join("") + "</div></div>") + "</div>" +
+      (cfg.selection ? '<div class="td-selbarre masque" data-selbarre></div>' : "") +
       '<div class="td-corps"></div>';
     var corps = zone.querySelector(".td-corps");
+    // Sélection multiple : cfg.selection = { sel:{id:true}, id(row), actions:html } ; Maj+clic = plage
+    var S = cfg.selection, derniere = null;
+    function majSelection(l) {
+      if (!S) return;
+      var n = Object.keys(S.sel).length, b = zone.querySelector("[data-selbarre]");
+      b.classList.toggle("masque", !n);
+      b.innerHTML = '<b>' + n + (n > 1 ? " sélectionnés" : " sélectionné") + '</b><span class="td-espace"></span>' + (S.actions || "") + '<button class="bouton" data-selvider>Tout désélectionner</button>';
+      var tous = zone.querySelector("[data-selall]");
+      if (tous) {
+        var k = l.filter(function (r) { return S.sel[S.id(r)]; }).length;
+        tous.checked = l.length > 0 && k === l.length; tous.indeterminate = k > 0 && k < l.length;
+      }
+    }
 
     function filtrees() {
       var q = st.q.trim().toLowerCase();
@@ -446,26 +460,28 @@
       if (st.page >= pages) st.page = pages - 1;
       var debut = st.page * st.taille, vue = l.slice(debut, debut + st.taille);
       var cols = cfg.colonnes.map(function (c, i) { return { c: c, i: i }; }).filter(function (x) { return !st.cachees[x.c.t]; });
-      var h = '<table class="table-donnees"><thead><tr>' + cols.map(function (x) {
+      var h = '<table class="table-donnees"><thead><tr>' + (S ? '<th class="g col-sel"><input type="checkbox" data-selall title="Sélectionner tous les éléments filtrés"></th>' : "") + cols.map(function (x) {
         var fl = st.tri && st.tri.i === x.i ? (st.tri.sens > 0 ? " ↑" : " ↓") : "";
         return '<th class="' + (x.c.a === "d" ? "" : "g") + '" data-tri="' + x.i + '">' + x.c.t + fl + "</th>";
       }).join("") + "</tr></thead><tbody>";
-      if (cfg.total) h += '<tr class="total">' + cols.map(function (x) { return '<td class="' + (x.c.a === "d" ? "" : "g") + '">' + (cfg.total[x.i] || "") + "</td>"; }).join("") + "</tr>";
-      if (!vue.length) h += '<tr><td colspan="' + cols.length + '" class="vide-ligne">' + E(cfg.vide || "Aucun élément disponible") + "</td></tr>";
+      if (cfg.total) h += '<tr class="total">' + (S ? "<td></td>" : "") + cols.map(function (x) { return '<td class="' + (x.c.a === "d" ? "" : "g") + '">' + (cfg.total[x.i] || "") + "</td>"; }).join("") + "</tr>";
+      if (!vue.length) h += '<tr><td colspan="' + (cols.length + (S ? 1 : 0)) + '" class="vide-ligne">' + E(cfg.vide || "Aucun élément disponible") + "</td></tr>";
       vue.forEach(function (r, k) {
         var det = cfg.detail ? cfg.detail(r) : null, cle = "d" + (debut + k);
-        h += '<tr class="' + (cfg.onLigne ? "cliquable" : "") + (det && det.length ? " depliable" : "") + '"' + (cfg.onLigne ? ' data-ligne="' + (debut + k) + '"' : "") + (det && det.length ? ' data-dep="' + cle + '"' : "") + ">" + cols.map(function (x, ci) {
+        var coche = S && S.sel[S.id(r)];
+        h += '<tr class="' + (cfg.onLigne ? "cliquable" : "") + (det && det.length ? " depliable" : "") + (coche ? " selectionnee" : "") + '"' + (cfg.onLigne ? ' data-ligne="' + (debut + k) + '"' : "") + (det && det.length ? ' data-dep="' + cle + '"' : "") + ">" +
+          (S ? '<td class="g col-sel" data-sel="' + (debut + k) + '"><input type="checkbox"' + (coche ? " checked" : "") + "></td>" : "") + cols.map(function (x, ci) {
           var v = x.c.f ? x.c.f(r) : E(r[x.c.k] == null ? "" : r[x.c.k]);
           return '<td class="' + (x.c.a === "d" ? "" : "g") + '">' + v + (ci === 0 && det && det.length ? ' <span class="chev-dep">' + App.icones.bas + "</span>" : "") + "</td>";
         }).join("") + "</tr>";
         (det || []).forEach(function (d) {
-          h += '<tr class="detail masque" data-parent="' + cle + '">' + cols.map(function (x) {
+          h += '<tr class="detail masque" data-parent="' + cle + '">' + (S ? "<td></td>" : "") + cols.map(function (x) {
             return '<td class="' + (x.c.a === "d" ? "" : "g") + '">' + (d[x.i] == null ? "" : d[x.i]) + "</td>";
           }).join("") + "</tr>";
         });
       });
       h += "</tbody></table>";
-      if (cfg.sansPied) { corps.innerHTML = h; corps._vue = l; return; }
+      if (cfg.sansPied) { corps.innerHTML = h; corps._vue = l; majSelection(l); return; }
       h += '<div class="td-pied"><span class="doux">De ' + (l.length ? debut + 1 : 0) + "-" + Math.min(l.length, debut + st.taille) + " sur " + App.entier(l.length) +
         " éléments - 0 lignes cachées par les filtres</span><span class=\"td-espace\"></span>" +
         '<span class="doux">Nombre de lignes par page</span><select data-taille>' +
@@ -475,13 +491,25 @@
         '<button class="bouton-icone" data-p="' + (st.page + 1) + '"' + (st.page >= pages - 1 ? " disabled" : "") + '>›</button><button class="bouton-icone" data-p="' + (pages - 1) + '"' + (st.page >= pages - 1 ? " disabled" : "") + ">»</button></div>";
       corps.innerHTML = h;
       corps._vue = l;
+      majSelection(l);
     }
     zone.addEventListener("input", function (e) { if (e.target.hasAttribute("data-r")) { st.q = e.target.value; st.page = 0; dessiner(); } });
     zone.addEventListener("change", function (e) { if (e.target.hasAttribute("data-taille")) { st.taille = +e.target.value; st.page = 0; dessiner(); } });
     zone.addEventListener("click", function (e) {
-      var t = e.target.closest("[data-tri],[data-p],[data-col],[data-filtrer],[data-ligne],[data-dep]");
+      var t = e.target.closest("[data-tri],[data-p],[data-col],[data-filtrer],[data-sel],[data-selall],[data-selvider],[data-ligne],[data-dep]");
       if (!t) return;
-      if (t.hasAttribute("data-dep") && !t.hasAttribute("data-ligne")) basculerDetail(zone, t);
+      if (t.hasAttribute("data-selall")) {
+        var vue = corps._vue, plein = vue.every(function (r) { return S.sel[S.id(r)]; });
+        vue.forEach(function (r) { if (plein) delete S.sel[S.id(r)]; else S.sel[S.id(r)] = true; });
+        dessiner();
+      } else if (t.hasAttribute("data-selvider")) { Object.keys(S.sel).forEach(function (k) { delete S.sel[k]; }); dessiner(); }
+      else if (t.hasAttribute("data-sel")) {
+        var v = corps._vue, i0 = +t.getAttribute("data-sel"), on = !S.sel[S.id(v[i0])];
+        var a = e.shiftKey && derniere !== null ? Math.min(derniere, i0) : i0, b = e.shiftKey && derniere !== null ? Math.max(derniere, i0) : i0;
+        for (var j = a; j <= b && j < v.length; j++) { if (on) S.sel[S.id(v[j])] = true; else delete S.sel[S.id(v[j])]; }
+        derniere = i0; dessiner();
+      }
+      else if (t.hasAttribute("data-dep") && !t.hasAttribute("data-ligne")) basculerDetail(zone, t);
       else if (t.hasAttribute("data-tri")) { var i = +t.getAttribute("data-tri"); st.tri = st.tri && st.tri.i === i ? { i: i, sens: -st.tri.sens } : { i: i, sens: 1 }; dessiner(); }
       else if (t.hasAttribute("data-p") && !t.disabled) { st.page = +t.getAttribute("data-p"); dessiner(); }
       else if (t.hasAttribute("data-col")) { var c = cfg.colonnes[+t.getAttribute("data-col")]; st.cachees[c.t] = !st.cachees[c.t]; dessiner(); }
@@ -605,7 +633,7 @@
   var ventes = [
     ["Produits", "products"], ["Options", "modifiers"], ["Employés", "employees"], ["Annulations", "cancelation"], ["Pertes", "losses"],
     ["Remises", "discounts"], ["Taxes", "taxes"], ["Paiements", "payments"], ["Catégories", "categories"],
-    ["Taux de Répartition", "sales-distribution"], ["Menus", "menus"], ["Historique des caisses", "z-report"], ["Fiscal", "fiscal"]
+    ["Taux de Répartition", "sales-distribution"], ["Menus", "menus"], ["Historique des caisses", "z-report"], ["Export comptable", "accounting-export"], ["Fiscal", "fiscal"]
   ].map(function (x) { return { label: x[0], route: "/reports/sales-report/" + x[1] }; });
   var reglagesPdv = [
     ["Imprimantes", "printers"], ["Postes de préparation", "prepa-stations"], ["Types de prix", "price-types"], ["Taxes", "taxes"],
