@@ -128,6 +128,10 @@
             A.fermerTiroir();
             A.info(LIB_MVT[type] + " enregistré : stock de " + l.productName + " = " + nl.quantity);
             ctx.rafraichir();
+            A.majAlertes().then(function (alertes) {
+              var a = alertes.filter(function (x) { return x.id === l.id; })[0];
+              if (a && type !== "ajout") A.info("Alerte : " + l.productName + " a atteint son seuil de réapprovisionnement (" + a.quantity + " ≤ " + a.seuil + ").");
+            });
           }, function (msg) { charger(String(msg)); });
       }
     });

@@ -83,7 +83,8 @@
   function formulaireProduit(ctx, zone, id) {
     Promise.all([D.getCatalogue(), D.getAllModifierGroups(), D.getGestionAchat(), id ? D.getProduct(id) : Promise.resolve(null)]).then(function (r) {
       var cat = r[0], groupes = r[1], achat = r[2], p = r[3];
-      var f = p ? JSON.parse(JSON.stringify(p)) : { nom: "", categorie: "", sousCategorie: "", poles: [], niveau: "Aucun", options: [], typePrix: "unitaire", prix: 0, tva: 10, achat: null, codeBarre: "", sku: "", plu: "", nomBouton: "", nomPrepa: "" };
+      var f = p ? JSON.parse(JSON.stringify(p)) : { nom: "", categorie: "", sousCategorie: "", poles: [], niveau: "Aucun", options: [], typePrix: "unitaire", prix: 0, tva: 10, achat: null, codeBarre: "", sku: "", plu: "", nomBouton: "", nomPrepa: "", seuilReappro: null };
+      var seuilTxt = f.seuilReappro === null || f.seuilReappro === undefined ? "" : String(f.seuilReappro).replace(".", ",");
       var onglet = ctx.etat.onglet || "gen", erreur = "";
       // Les champs numériques sont gardés en texte pour ne pas perdre la saisie en cours
       var prixTxt = p ? p.prix.toFixed(2).replace(".", ",") : "", achatTxt = p && p.achat !== null ? String(p.achat).replace(".", ",") : "";
@@ -125,7 +126,9 @@
           ligne("Options", puces(groupes.map(function (g) { return g.nom; }), f.options, "options")) +
           ligne("Prix", '<div class="segment">' + TYPES_PRIX.map(function (t) { return '<button type="button" class="' + (t[0] === f.typePrix ? "actif" : "") + '" data-typeprix="' + t[0] + '">' + t[1] + "</button>"; }).join("") + "</div>") +
           ligne("Normal*", '<div class="pf-prix"><input class="pf-in" data-k="prix" inputmode="decimal" placeholder="0,00" value="' + E(prixTxt) + '"><span class="pf-unite">€ TTC</span><select class="pf-in pf-tva" data-k="tva">' +
-            options(tvaListe.map(function (t) { return [t, "TVA " + String(t).replace(".", ",") + "%"]; }), f.tva) + "</select></div>");
+            options(tvaListe.map(function (t) { return [t, "TVA " + String(t).replace(".", ",") + "%"]; }), f.tva) + "</select></div>") +
+          ligne("Seuil de réapprovisionnement", '<div class="pf-prix"><input class="pf-in" data-k="seuilReappro" inputmode="decimal" placeholder="Aucun" value="' + E(seuilTxt) + '"><span class="pf-unite">unités</span></div>' +
+            '<span class="doux pf-aide">Une alerte (cloche en haut à droite) apparaît quand le stock déclaré atteint ce seuil.</span>');
       }
       function dessiner() {
         zone.innerHTML = '<div class="carte pf"><h2 class="pf-titre">' + (p ? "Modifier un produit" : "Créer un produit") + "</h2>" +
@@ -153,7 +156,7 @@
         } else {
           var prix = nombre(prixTxt);
           D.setProduct(id, { nom: f.nom, categorie: f.categorie, sousCategorie: f.sousCategorie, poles: f.poles, niveau: f.niveau, options: f.options, typePrix: f.typePrix,
-            prix: prix === null ? NaN : prix, tva: f.tva, achat: achat ? nombre(achatTxt) : f.achat, codeBarre: f.codeBarre, sku: f.sku, plu: f.plu, nomBouton: f.nomBouton, nomPrepa: f.nomPrepa })
+            prix: prix === null ? NaN : prix, tva: f.tva, achat: achat ? nombre(achatTxt) : f.achat, codeBarre: f.codeBarre, sku: f.sku, plu: f.plu, nomBouton: f.nomBouton, nomPrepa: f.nomPrepa, seuilReappro: nombre(seuilTxt) })
             .then(function () { A.info(p ? "Produit modifié." : "Produit créé."); ctx.etat.onglet = "gen"; A.allerA(CHEMIN_PRODUITS); },
               function (msg) { erreur = String(msg); onglet = ctx.etat.onglet = "gen"; dessiner(); });
         }
@@ -163,6 +166,7 @@
         var k = e.target.getAttribute("data-k");
         if (!k) return;
         if (k === "prix") prixTxt = e.target.value; else if (k === "achat") achatTxt = e.target.value;
+        else if (k === "seuilReappro") seuilTxt = e.target.value;
         else if (k === "tva") f.tva = +e.target.value; else f[k] = e.target.value;
         if (k === "categorie") { f.sousCategorie = ""; dessiner(); return; }
         var b = document.getElementById("pf-marge");
