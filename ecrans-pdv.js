@@ -476,6 +476,58 @@
     }
   });
 
+  // ---------- Réglages : créneaux de service (2 ou 3, horaires libres, utilisés par Taux de répartition) ----------
+  A.ecran(PDV + "settings/service-slots", {
+    section: "pdv", fil: fil("Créneaux de service", true), filtres: [],
+    rendre: function (ctx, zone) {
+      var et = ctx.etat;
+      if (!et.brouillon) et.brouillon = D.getCreneaux();
+      var b = et.brouillon;
+      function lire() {
+        zone.querySelectorAll("[data-cren]").forEach(function (champ) {
+          var p = champ.getAttribute("data-cren").split("-");
+          if (b[+p[0]]) b[+p[0]][p[1]] = champ.value;
+        });
+      }
+      function plage(c) { var x = +c.debut.slice(0, 2) * 60 + +c.debut.slice(3), y = +c.fin.slice(0, 2) * 60 + +c.fin.slice(3); return [x, y <= x ? y + 1440 : y]; }
+      A.act.crenNb = function (v) {
+        lire();
+        var n = +v;
+        while (b.length > n) b.pop();
+        while (b.length < n) b.push({ nom: "Service " + (b.length + 1), debut: "18:00", fin: "23:00" });
+        ctx.rafraichir();
+      };
+      A.act.crenAnnuler = function () { et.brouillon = null; ctx.rafraichir(); };
+      A.act.crenDefaut = function () { D.setCreneaux(null); et.brouillon = null; A.info("Créneaux par défaut rétablis."); ctx.rafraichir(); };
+      A.act.crenSauver = function () {
+        lire();
+        for (var i = 0; i < b.length; i++) {
+          var c = b[i];
+          c.nom = String(c.nom || "").replace(/^\s+|\s+$/g, "");
+          if (!c.nom) { A.info("Donnez un nom à chaque créneau."); return; }
+          if (!/^\d\d:\d\d$/.test(c.debut) || !/^\d\d:\d\d$/.test(c.fin)) { A.info("Renseignez les horaires de « " + c.nom + " »."); return; }
+          if (c.debut === c.fin) { A.info("Début et fin identiques pour « " + c.nom + " »."); return; }
+        }
+        for (var x = 0; x < b.length; x++) for (var y = x + 1; y < b.length; y++) {
+          var p1 = plage(b[x]), p2 = plage(b[y]);
+          if ((p1[0] < p2[1] && p2[0] < p1[1]) || (p1[0] < p2[1] - 1440 && p2[0] - 1440 < p1[1]) || (p2[0] < p1[1] - 1440 && p1[0] - 1440 < p2[1])) { A.info("« " + b[x].nom + " » et « " + b[y].nom + " » se chevauchent."); return; }
+        }
+        if (!D.setCreneaux(b)) { A.info("Stockage du navigateur indisponible."); return; }
+        et.brouillon = null; A.info("Créneaux enregistrés."); ctx.rafraichir();
+      };
+      zone.innerHTML = '<div class="carte"><div class="carte-tete"><h2>Créneaux de service</h2></div><div class="carte-corps pad"><div class="cren-edit">' +
+        '<p class="doux">Ces horaires découpent les ventes dans Rapports des ventes › Taux de répartition › « Ventes par créneau de service ».</p>' +
+        '<div class="cren-ligne"><span>Nombre de créneaux</span>' + A.segment("crenNb", [["2", "2"], ["3", "3"]], String(b.length), A.act.crenNb) + "</div>" +
+        b.map(function (c, i) {
+          return '<div class="cren-ligne"><input class="cren-nom" type="text" maxlength="30" data-cren="' + i + '-nom" value="' + E(c.nom) + '" aria-label="Nom du créneau ' + (i + 1) + '">' +
+            '<label>de <input type="time" data-cren="' + i + '-debut" value="' + E(c.debut) + '"></label>' +
+            '<label>à <input type="time" data-cren="' + i + '-fin" value="' + E(c.fin === "24:00" ? "00:00" : c.fin) + '"></label></div>';
+        }).join("") +
+        '<div class="cren-note">Une fin plus petite que le début passe minuit (ex. 18:00 → 01:00). Les ventes hors créneau sont regroupées à part.</div>' +
+        '<div class="cren-actions">' + A.bouton("Enregistrer", "crenSauver", { classe: "sombre" }) + A.bouton("Annuler", "crenAnnuler") + A.bouton("Rétablir par défaut", "crenDefaut") + "</div></div></div></div>";
+    }
+  });
+
   // ---------- Réglages : réglages divers ----------
   A.ecran(PDV + "settings/misc-settings", {
     section: "pdv", fil: fil("Réglages divers", true), filtres: [],

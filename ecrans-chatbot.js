@@ -37,6 +37,7 @@
     ["categorie", "/reports/sales-report/categories", "les catégories"],
     ["repartition", "/reports/sales-report/sales-distribution", "le taux de répartition"],
     ["menu", "/reports/sales-report/menus", "les menus"],
+    ["compta|fec", "/reports/sales-report/accounting-export", "l'export comptable"],
     ["historique|z de caisse|caisses", "/reports/sales-report/z-report", "l'historique des caisses"],
     ["fiscal", "/reports/sales-report/fiscal", "le fiscal"],
     ["prevision|meteo", "/reports/forecast", "les prévisions météo"],

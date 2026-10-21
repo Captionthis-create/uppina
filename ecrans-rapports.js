@@ -501,55 +501,9 @@
               return '<td style="background:rgba(30,70,200,' + (0.05 + a * 0.85).toFixed(2) + ');color:' + (a > 0.5 ? "#fff" : "inherit") + '" title="' + A.euro(v) + '">' + (v ? Math.round(v) : "") + "</td>";
             }).join("") + "</tr>";
           }).join("") + "</tbody></table></div>";
-        // Créneaux de service : 2 ou 3, nom et horaires libres
-        var brouillon = et.brouillon;
-        function lireBrouillon() {
-          zone.querySelectorAll("[data-cren]").forEach(function (champ) {
-            var p = champ.getAttribute("data-cren").split("-");
-            if (brouillon[+p[0]]) brouillon[+p[0]][p[1]] = champ.value;
-          });
-        }
-        A.act.crenPerso = function () { et.brouillon = D.getCreneaux(); ctx.rafraichir(); };
-        A.act.crenNb = function (v) {
-          lireBrouillon();
-          var n = +v;
-          while (brouillon.length > n) brouillon.pop();
-          while (brouillon.length < n) brouillon.push({ nom: "Service " + (brouillon.length + 1), debut: "18:00", fin: "23:00" });
-          ctx.rafraichir();
-        };
-        A.act.crenAnnuler = function () { et.brouillon = null; ctx.rafraichir(); };
-        A.act.crenDefaut = function () { D.setCreneaux(null); et.brouillon = null; A.info("Créneaux par défaut rétablis."); ctx.rafraichir(); };
-        A.act.crenSauver = function () {
-          lireBrouillon();
-          for (var i = 0; i < brouillon.length; i++) {
-            var c = brouillon[i];
-            c.nom = String(c.nom || "").replace(/^\s+|\s+$/g, "");
-            if (!c.nom) { A.info("Donnez un nom à chaque créneau."); return; }
-            if (!/^\d\d:\d\d$/.test(c.debut) || !/^\d\d:\d\d$/.test(c.fin)) { A.info("Renseignez les horaires de « " + c.nom + " »."); return; }
-            if (c.debut === c.fin) { A.info("Début et fin identiques pour « " + c.nom + " »."); return; }
-          }
-          // Les créneaux ne doivent pas se chevaucher
-          function plage(c) { var a = +c.debut.slice(0, 2) * 60 + +c.debut.slice(3), b = +c.fin.slice(0, 2) * 60 + +c.fin.slice(3); return [a, b <= a ? b + 1440 : b]; }
-          for (var x = 0; x < brouillon.length; x++) for (var y = x + 1; y < brouillon.length; y++) {
-            var p1 = plage(brouillon[x]), p2 = plage(brouillon[y]);
-            if ((p1[0] < p2[1] && p2[0] < p1[1]) || (p1[0] < p2[1] - 1440 && p2[0] - 1440 < p1[1]) || (p2[0] < p1[1] - 1440 && p1[0] - 1440 < p2[1])) { A.info("« " + brouillon[x].nom + " » et « " + brouillon[y].nom + " » se chevauchent."); return; }
-          }
-          if (!D.setCreneaux(brouillon)) { A.info("Stockage du navigateur indisponible."); return; }
-          et.brouillon = null; A.info("Créneaux enregistrés."); ctx.rafraichir();
-        };
-        var editeur = "";
-        if (brouillon) {
-          editeur = '<div class="cren-edit"><div class="cren-ligne"><span>Nombre de créneaux</span>' + A.segment("crenNb", [["2", "2"], ["3", "3"]], String(brouillon.length), A.act.crenNb) + "</div>" +
-            brouillon.map(function (c, i) {
-              return '<div class="cren-ligne"><input class="cren-nom" type="text" maxlength="30" data-cren="' + i + '-nom" value="' + E(c.nom) + '" aria-label="Nom du créneau ' + (i + 1) + '">' +
-                '<label>de <input type="time" data-cren="' + i + '-debut" value="' + E(c.debut) + '"></label>' +
-                '<label>à <input type="time" data-cren="' + i + '-fin" value="' + E(c.fin) + '"></label></div>';
-            }).join("") +
-            '<div class="cren-note">Une fin plus petite que le début passe minuit (ex. 18:00 → 01:00). Les ventes hors créneau sont regroupées à part.</div>' +
-            '<div class="cren-actions">' + A.bouton("Enregistrer", "crenSauver", { classe: "sombre" }) + A.bouton("Annuler", "crenAnnuler") + A.bouton("Rétablir par défaut", "crenDefaut") + "</div></div>";
-        }
-        var cartesCren = A.carte("Ventes par créneau de service", editeur + A.graph.barresEmpilees({ labels: r.parCreneau.map(function (o) { return o.slot + (o.horaire ? " (" + o.horaire + ")" : ""); }), segments: segs(r.parCreneau.map(function (o) { return { valeurs: o.valeurs, quantites: o.quantites, nbSessions: 0 }; }), false), formatter: fmt }) + legende,
-          { droite: brouillon ? "" : A.bouton("Personnaliser les créneaux", "crenPerso") });
+        A.act.crenReglage = function () { location.hash = "#/point-of-sale/settings/service-slots"; };
+        var cartesCren = A.carte("Ventes par créneau de service", A.graph.barresEmpilees({ labels: r.parCreneau.map(function (o) { return o.slot + (o.horaire ? " (" + o.horaire + ")" : ""); }), segments: segs(r.parCreneau.map(function (o) { return { valeurs: o.valeurs, quantites: o.quantites, nbSessions: 0 }; }), false), formatter: fmt }) + legende,
+          { droite: A.bouton("Régler les créneaux", "crenReglage") });
         zone.innerHTML =
           A.carte("Ventes par jour de la semaine", A.graph.barresEmpilees({ labels: r.parJour.map(function (o) { return o.day; }), segments: segs(r.parJour, true), formatter: fmt }) + legende, { droite: controles }) +
           cartesCren +
@@ -577,9 +531,10 @@
 
   // ---------- Historique des caisses ----------
   A.ecran("/reports/sales-report/z-report", {
-    section: "rapports", fil: FIL("Historique des caisses"), filtres: FILTRES_SANS_TRANCHE, actions: function () { return exportPdf(); },
+    section: "rapports", fil: FIL("Historique des caisses"), filtres: FILTRES_SANS_TRANCHE, actions: function () { return A.bouton("Export comptable", "compta") + exportPdf(); },
     rendre: function (ctx, zone) {
       brancherPdf();
+      A.act.compta = function () { A.allerA("/reports/sales-report/accounting-export", { dateStart: ctx.periode.dateStart, dateEnd: ctx.periode.dateEnd }); };
       D.getNewHistoryZTill(P(ctx)).then(function (l) {
         var tot = 0; l.forEach(function (z) { tot += z.totalSales; });
         zone.innerHTML = A.carte("", A.table([{ t: "Date" }, { t: "Créneaux" }, d("Total TTC"), { t: "" }],
