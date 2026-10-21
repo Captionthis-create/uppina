@@ -640,3 +640,19 @@ body { overflow-x: hidden; }
 .chat-saisie { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--ligne); }
 .chat-saisie input { flex: 1; min-width: 0; height: 34px; border: 1px solid var(--bordure); background: var(--champ); color: var(--texte); border-radius: 8px; padding: 0 10px; font-size: 12px; }
 @media (max-width: 600px) { .chat-panneau, .chat-panneau.large { right: 8px; left: 8px; width: auto; bottom: 78px; } }
+/* Objectifs de CA / couverts */
+.obj-haut { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.obj-pct { font-size: 28px; font-weight: 600; }
+.obj-barre { position: relative; height: 12px; border-radius: 6px; background: var(--bordure); margin-bottom: 14px; }
+.obj-barre i { display: block; height: 100%; border-radius: 6px; }
+.obj-barre i.ok { background: var(--vert); }
+.obj-barre i.ko { background: #e8a33d; }
+.obj-barre b { position: absolute; top: -4px; width: 2px; height: 20px; background: var(--texte); }
+.obj-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; font-size: 12px; }
+.obj-detail span { display: block; color: #888; margin-bottom: 2px; }
+.obj-detail b { font-size: 13px; font-weight: 600; }
+.obj-champ { width: 130px; height: 32px; padding: 0 8px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--champ); color: var(--texte); font-size: 13px; text-align: right; }
+.obj-haut { margin: 12px 16px 10px; }
+.obj-barre { margin: 0 16px 16px; }
+.obj-detail { margin: 0 16px 16px; }
+.obj-note { margin: 12px 16px; }
