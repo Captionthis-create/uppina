@@ -17,6 +17,10 @@
     </a>
     <nav class="entete-liens">
       <span class="badge-mode" id="badge-mode" hidden>DONNÉES RÉELLES</span>
+      <div class="menu-conteneur" id="cloche-alertes" hidden>
+        <button class="bouton-cloche" data-ouvre="alertes" title="Alertes de réapprovisionnement" aria-label="Alertes de réapprovisionnement"></button>
+        <div class="menu-flottant droite menu-alertes" id="menu-alertes"></div>
+      </div>
       <a id="lien-news" href="#/whats-new">Quoi de neuf</a>
       <a id="lien-aide" href="#/help">Centre d'aide</a>
       <div class="menu-conteneur">
@@ -40,6 +44,7 @@
   <script src="ecrans-meteo.js"></script>
   <script src="ecrans-pdv.js"></script>
   <script src="ecrans-autres.js"></script>
+  <script src="ecrans-chatbot.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

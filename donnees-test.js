@@ -500,6 +500,20 @@
       .sort(function (a, b) { return b.totalSalesOwner - a.totalSalesOwner; }));
   }
 
+  // ---- Objectifs de CA / couverts : saisis par l'utilisateur, par mois, gardés dans le navigateur ----
+  var CLE_OBJECTIFS = "objectifs-copie";
+  function lireObjectifs() {
+    try { return JSON.parse(localStorage.getItem(CLE_OBJECTIFS) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function getObjectifs() { return reponse(lireObjectifs()); }
+  // mois = "AAAA-MM" ; obj = { ca, couverts } (0 ou vide = pas d'objectif) ; null efface le mois
+  function setObjectif(mois, obj) {
+    var tous = lireObjectifs(), ca = obj ? Math.max(0, +obj.ca || 0) : 0, cv = obj ? Math.max(0, Math.round(+obj.couverts || 0)) : 0;
+    if (ca || cv) tous[mois] = { ca: ca, couverts: cv }; else delete tous[mois];
+    try { localStorage.setItem(CLE_OBJECTIFS, JSON.stringify(tous)); } catch (e) { return Promise.reject("Stockage du navigateur indisponible."); }
+    return reponse(tous);
+  }
+
   function getRealTime() {
     // Aucune caisse ouverte (comme sur la capture : « Aucune donnée disponible »)
     return reponse({ realTimeData: { totalSales: 0, guestsNumber: 0, orderCount: 0, totalCanceled: 0, totalByHours: [] }, lastWeekData: { totalByHours: [] } });
@@ -530,6 +544,15 @@
     try { localStorage.setItem(CLE_STOCK, JSON.stringify({ stock: STOCK, mouvements: MOUVEMENTS })); } catch (e) { /* stockage indisponible */ }
   }
   function getHybridStock() { initStock(); return reponse(STOCK); }
+  // Produits dont le stock déclaré est au seuil de réapprovisionnement (fiche produit) ou en dessous, les plus bas d'abord
+  function getAlertesStock() {
+    initStock(); initEdits();
+    var seuils = {};
+    tousProduits().forEach(function (p) { if (p.seuilReappro !== null && p.seuilReappro !== undefined) seuils[p.id] = p.seuilReappro; });
+    return reponse(STOCK.filter(function (l) { return seuils[l.id] !== undefined && l.quantity <= seuils[l.id]; })
+      .map(function (l) { return { id: l.id, productName: l.productName, quantity: l.quantity, seuil: seuils[l.id] }; })
+      .sort(function (a, b) { return a.quantity - b.quantity; }));
+  }
   function getStockMovements(id) { initStock(); return reponse(MOUVEMENTS[id] || []); }
   // m = { type: "ajout" | "inventaire" | "perte", quantite, motif, note } ; rejette avec un message si invalide
   function setStockMovement(id, m) {
@@ -867,7 +890,7 @@
   // modifs : id produit existant -> champs modifiés ; ajouts : produits créés ; achat : gestion des prix d'achat activée
   var CLE_PRODUITS = "produits-copie";
   var EDITS = null;
-  var CHAMPS_PRODUIT = ["nom", "categorie", "sousCategorie", "poles", "niveau", "options", "typePrix", "prix", "tva", "achat", "codeBarre", "sku", "plu", "nomBouton", "nomPrepa"];
+  var CHAMPS_PRODUIT = ["nom", "categorie", "sousCategorie", "poles", "niveau", "options", "typePrix", "prix", "tva", "achat", "codeBarre", "sku", "plu", "nomBouton", "nomPrepa", "seuilReappro"];
   function initEdits() {
     if (EDITS) return;
     try { EDITS = JSON.parse(localStorage.getItem(CLE_PRODUITS) || "null"); } catch (e) { EDITS = null; }
@@ -887,7 +910,7 @@
     var o = {
       id: base.id, nom: base.nom, categorie: base.categorie, sousCategorie: base.sousCategorie, poles: ajout ? [] : poles(base),
       niveau: "Aucun", options: !ajout && base.groupe ? [base.groupe] : [], typePrix: "unitaire", prix: base.prix, tva: base.tva, achat: null,
-      codeBarre: "", sku: "", plu: "", nomBouton: "", nomPrepa: "", nbPrix: 1, ajoute: !!ajout, modifie: !ajout && !!EDITS.modifs[base.id]
+      codeBarre: "", sku: "", plu: "", nomBouton: "", nomPrepa: "", seuilReappro: null, nbPrix: 1, ajoute: !!ajout, modifie: !ajout && !!EDITS.modifs[base.id]
     };
     CHAMPS_PRODUIT.forEach(function (k) { if (m[k] !== undefined) o[k] = m[k]; });
     o.couleur = couleurCategorie(o.categorie, base.couleur);
@@ -911,9 +934,11 @@
     if (!isFinite(prix) || prix < 0) return Promise.reject("Prix invalide.");
     if (!isFinite(tva)) return Promise.reject("Choisir la TVA.");
     if (achat !== null && (!isFinite(achat) || achat < 0)) return Promise.reject("Prix d'achat invalide.");
+    var seuil = d.seuilReappro === null || d.seuilReappro === "" || d.seuilReappro === undefined ? null : Math.round(+d.seuilReappro * 100) / 100;
+    if (seuil !== null && (!isFinite(seuil) || seuil < 0)) return Promise.reject("Seuil de réapprovisionnement invalide.");
     var val = { nom: nom, categorie: d.categorie, sousCategorie: d.sousCategorie || "", poles: d.poles || [], niveau: d.niveau || "Aucun", options: d.options || [],
       typePrix: d.typePrix || "unitaire", prix: prix, tva: tva, achat: achat, codeBarre: String(d.codeBarre || "").trim(), sku: String(d.sku || "").trim(),
-      plu: String(d.plu || "").trim(), nomBouton: String(d.nomBouton || "").trim(), nomPrepa: String(d.nomPrepa || "").trim() };
+      plu: String(d.plu || "").trim(), nomBouton: String(d.nomBouton || "").trim(), nomPrepa: String(d.nomPrepa || "").trim(), seuilReappro: seuil };
     var ajout = id ? EDITS.ajouts.filter(function (a) { return a.id === id; })[0] : null;
     if (!id) { val.id = "n" + Date.now(); EDITS.ajouts.push(val); id = val.id; }
     else if (ajout) { val.id = id; EDITS.ajouts[EDITS.ajouts.indexOf(ajout)] = val; }
@@ -1308,7 +1333,7 @@
     getLocations: function () { return reponse(SITES); },
     getHomePage: getHomePage, getOrders: getOrders, getOrderById: getOrderById,
     getReportTotalSales: getReportTotalSales, getReportProductsAndCategories: getReportProductsAndCategories,
-    getReportClerkShifts: getReportClerkShifts, getRealTime: getRealTime, getHybridStock: getHybridStock,
+    getReportClerkShifts: getReportClerkShifts, getObjectifs: getObjectifs, setObjectif: setObjectif, getRealTime: getRealTime, getHybridStock: getHybridStock, getAlertesStock: getAlertesStock,
     getStockMovements: getStockMovements, setStockMovement: setStockMovement, MOTIFS_PERTE: MOTIFS_PERTE,
     getReportProductData: getReportProductData, getReportModifiers: getReportModifiers, getEmployees: getEmployees,
     getReportCancelation: getReportCancelation, getReportLosses: getReportLosses, getReportDiscount: getReportDiscount,

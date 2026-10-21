@@ -618,6 +618,7 @@
       titre: "Rapports", items: [
         { label: "Tableau de bord", route: "/reports/dashboard", icone: ICONES.courbe },
         { label: "Caisses en cours", route: "/reports/tills-in-progress", icone: ICONES.direct },
+        { label: "Objectifs", route: "/reports/objectifs", icone: ICONES.courbe },
         { label: "Stocks", route: "/reports/stocks", icone: ICONES.stocks },
         { label: "Prévisions météo", route: "/reports/forecast", icone: ICONES.soleil, meteo: true },
         { groupe: "ventes", label: "Rapports des ventes", icone: ICONES.dossier, items: ventes }
@@ -804,6 +805,24 @@
     }
     cfg.rendre(ctx, zone);
     window.scrollTo(0, 0);
+    App.majAlertes();
+  };
+
+  // Cloche d'alertes : produits dont le stock a atteint le seuil de réapprovisionnement (stocks factices, donc masquée en mode Réelles)
+  App.majAlertes = function () {
+    var conteneur = document.getElementById("cloche-alertes");
+    if (DonneesTest.mode === "reelles") { conteneur.hidden = true; return Promise.resolve([]); }
+    return DonneesTest.getAlertesStock().then(function (liste) {
+      var bouton = conteneur.querySelector(".bouton-cloche");
+      conteneur.hidden = false;
+      bouton.innerHTML = ICONES.cloche + (liste.length ? '<span class="pastille-alerte">' + liste.length + "</span>" : "");
+      document.getElementById("menu-alertes").innerHTML = '<div class="alertes-titre">Réapprovisionnement</div>' + (liste.length ?
+        liste.map(function (a) {
+          return '<a class="alerte-ligne" href="#/reports/stocks"><span class="alerte-nom">' + E(a.productName) + '</span><span class="alerte-detail ' + (a.quantity === 0 ? "vide" : "") + '">' +
+            (a.quantity === 0 ? "Rupture" : "Stock " + a.quantity) + " · seuil " + a.seuil + "</span></a>";
+        }).join("") : '<div class="alerte-vide">Aucun produit sous son seuil.</div>');
+      return liste;
+    });
   };
 
   // ======================================================================
