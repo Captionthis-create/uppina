@@ -846,7 +846,7 @@
       bouton.innerHTML = ICONES.cloche + (liste.length ? '<span class="pastille-alerte">' + liste.length + "</span>" : "");
       document.getElementById("menu-alertes").innerHTML = '<div class="alertes-titre">Réapprovisionnement</div>' + (liste.length ?
         liste.map(function (a) {
-          return '<a class="alerte-ligne" href="#/reports/stocks"><span class="alerte-nom">' + E(a.productName) + '</span><span class="alerte-detail ' + (a.quantity === 0 ? "vide" : "") + '">' +
+          return '<a class="alerte-ligne" href="#/reports/stocks"><span class="alerte-nom">' + E(a.productName) + '</span><span class="alerte-detail ' + (a.quantity === 0 ? "rupture" : "") + '">' +
             (a.quantity === 0 ? "Rupture" : "Stock " + a.quantity) + " · seuil " + a.seuil + "</span></a>";
         }).join("") : '<div class="alerte-vide">Aucun produit sous son seuil.</div>');
       return liste;
