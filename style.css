@@ -124,12 +124,12 @@ hr { border: 0; border-top: 1px solid var(--ligne); margin: 8px 0; }
 .bouton-cloche:hover { background: var(--survol); color: var(--texte); }
 .bouton-cloche svg { width: 16px; height: 16px; }
 .pastille-alerte { position: absolute; top: -2px; right: -3px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: #e5484d; color: #fff; font-size: 9px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
-.menu-alertes { min-width: 280px; }
+.menu-flottant.menu-alertes { min-width: 280px; }
 .alertes-titre { padding: 6px 10px; font-size: 11px; font-weight: 600; color: var(--texte); }
 .alerte-ligne { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 6px; color: var(--texte); text-decoration: none; font-size: 12px; }
 .alerte-ligne:hover { background: var(--survol); }
 .alerte-detail { font-size: 11px; color: #d9822b; }
-.alerte-detail.vide { color: #e5484d; }
+.alerte-detail.rupture { color: #e5484d; }
 .alerte-vide { padding: 8px 10px; font-size: 12px; color: var(--texte-doux); }
 .pf-aide { display: block; margin-top: 4px; font-size: 11px; }
 .bouton { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 32px; padding: 0 14px; font-size: 12px; background: var(--carte); color: var(--texte); border: 1px solid var(--bordure); border-radius: 8px; cursor: pointer; white-space: nowrap; }
