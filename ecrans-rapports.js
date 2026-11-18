@@ -315,6 +315,7 @@
             A.table([{ t: "Produit" }, d("Quantité"), d("Total")], liste.map(function (p) { return [E(p.name), A.entier(p.quantity), '<span class="mono">' + A.euro(p.netAmount) + "</span>"]; }), null, { classe: "zebre" }) + "</div></div>";
         }
         var et = ctx.etat, grp = et.grouper || "";
+        var rechInit = et.recherche || ""; delete et.recherche; // recherche pré-remplie par Pop'IA, une seule fois
         var lignesTable = r.items, detailTable = function (p) { return p.pricingList.map(function (x) { return ["", "", E(x.pricing), A.entier(x.quantity), A.euro(x.excludingTax), A.euro(x.sales)]; }); };
         if (grp) {
           var g = {};
@@ -333,7 +334,7 @@
             { t: "Quantité", a: "d", f: function (p) { return "<b>" + A.entier(p.quantity) + "</b>"; }, tri: function (p) { return p.quantity; } },
             { t: "Total HT", a: "d", f: function (p) { return "<b>" + A.euro(p.excludingTax) + "</b>"; }, tri: function (p) { return p.excludingTax; } },
             { t: "Total", a: "d", f: function (p) { return "<b>" + A.euro(p.netAmount) + "</b>"; }, tri: function (p) { return p.netAmount; } }],
-          lignes: lignesTable, rech: { ph: grp ? "Rechercher une catégorie" : "Rechercher un produit", texte: function (p) { return p.name; } }, pageSize: 20,
+          lignes: lignesTable, rech: { initial: rechInit, ph: grp ? "Rechercher une catégorie" : "Rechercher un produit", texte: function (p) { return p.name; } }, pageSize: 20,
           total: ["Total", "", "", "<b>" + A.entier(r.totals.quantity) + "</b>", "<b>" + A.euro(r.totals.excludingTax) + "</b>", "<b>" + A.euro(r.totals.netAmount) + "</b>"],
           droite: A.liste("regrouper", "Regrouper par", [["categorie", "Catégorie"], ["sous", "Sous-catégorie"]], grp, A.act.regrouper),
           detail: detailTable
@@ -362,7 +363,11 @@
   A.ecran("/reports/sales-report/employees", {
     section: "rapports", fil: FIL("Employés"), filtres: FILTRES, actions: function () { return exportCsv(); },
     rendre: function (ctx, zone) {
-      D.getEmployees(P(ctx)).then(function (l) {
+      D.getEmployees(P(ctx)).then(function (tous) {
+        var et = ctx.etat, l = tous;
+        if (et.employe) l = tous.filter(function (e) { return e.operatorName === et.employe; });
+        A.act.empRaz = function () { delete et.employe; ctx.rafraichir(); };
+        var puce = et.employe ? '<div class="td-puces"><span class="puce-filtre">Employé <b>' + E(et.employe) + '</b><button data-act="empRaz" aria-label="Retirer le filtre">✕</button></span></div>' : "";
         A.act.export = function () {
           A.telechargerCsv("employes.csv", ["Nom", "Total Ventes", "Total Encaissé", "Pourboires", "Total Annulé", "Total Pertes", "Commandes", "Couverts"],
             l.map(function (e) { return [e.operatorName, A.montantCsv(e.operatorTotalOrderSales), A.montantCsv(e.operatorTotalCashed), A.montantCsv(e.operatorTotalTips), A.montantCsv(e.operatorTotalCanceled), A.montantCsv(e.operatorTotalLoss), e.operatorOrderCount, e.operatorGuestCount]; }));
@@ -370,14 +375,14 @@
         function top(titre, cols, rangees) {
           return A.carte(titre, A.table(cols, rangees, null), {});
         }
-        var ventes = l.slice(0, 5).map(function (e) { return [E(e.operatorName), A.euro(e.operatorTotalOrderSales)]; });
-        var remises = l.slice().sort(function (a, b) { return b.operatorTotalDiscount - a.operatorTotalDiscount; }).slice(0, 5).map(function (e) { return [E(e.operatorName), A.entier(e.operatorTotalDiscountQuantity), A.euro(e.operatorTotalDiscount)]; });
-        var annul = l.slice().sort(function (a, b) { return b.operatorTotalCanceled - a.operatorTotalCanceled; }).slice(0, 5).map(function (e) { return [E(e.operatorName), A.entier(e.operatorTotalCanceledQuantity), A.euro(e.operatorTotalCanceled)]; });
+        var ventes = tous.slice(0, 5).map(function (e) { return [E(e.operatorName), A.euro(e.operatorTotalOrderSales)]; });
+        var remises = tous.slice().sort(function (a, b) { return b.operatorTotalDiscount - a.operatorTotalDiscount; }).slice(0, 5).map(function (e) { return [E(e.operatorName), A.entier(e.operatorTotalDiscountQuantity), A.euro(e.operatorTotalDiscount)]; });
+        var annul = tous.slice().sort(function (a, b) { return b.operatorTotalCanceled - a.operatorTotalCanceled; }).slice(0, 5).map(function (e) { return [E(e.operatorName), A.entier(e.operatorTotalCanceledQuantity), A.euro(e.operatorTotalCanceled)]; });
         var s = { v: 0, c: 0, a: 0, n: 0, g: 0, r: 0, p: 0, t: 0 };
         l.forEach(function (e) { s.v += e.operatorTotalOrderSales; s.c += e.operatorTotalCashed; s.a += e.operatorTotalCanceled; s.n += e.operatorOrderCount; s.g += e.operatorGuestCount; s.r += e.operatorTotalDiscount; s.p += e.operatorTotalLoss; s.t += e.operatorTotalTips; });
         zone.innerHTML = '<div class="trois-col">' + top("Top Ventes", [{ t: "Nom" }, d("Total")], ventes) + top("Top Remises", [{ t: "Nom" }, d("Quantité"), d("Total")], remises) +
           top("Top Annulations", [{ t: "Nom" }, d("Quantité"), d("Total")], annul) + "</div>" +
-          A.carte("Tableau des Employés", '<div class="defile-x">' + A.table(
+          A.carte("Tableau des Employés", puce + '<div class="defile-x">' + A.table(
             [{ t: "Nom" }, d("Total Ventes"), d("Total Encaissé"), d("Pourboires"), d("Total Annulé"), d("Total Pertes"), d("Nombres de Commandes"), d("Nombre de Couverts"), d("Total Remises"), d("Couvert moyen"), d("Commande moyenne")],
             l.map(function (e) { return [E(e.operatorName), A.euro(e.operatorTotalOrderSales), A.euro(e.operatorTotalCashed), A.euro(e.operatorTotalTips), A.euro(e.operatorTotalCanceled), A.euro(e.operatorTotalLoss), A.entier(e.operatorOrderCount), A.entier(e.operatorGuestCount), A.euro(e.operatorTotalDiscount), A.euro(e.operatorAverageCover), A.euro(e.operatorAverageOrder)]; }),
             ["<b>Total</b>", "<b>" + A.euro(s.v) + "</b>", "<b>" + A.euro(s.c) + "</b>", "<b>" + A.euro(s.t) + "</b>", "<b>" + A.euro(s.a) + "</b>", "<b>" + A.euro(s.p) + "</b>", "<b>" + A.entier(s.n) + "</b>", "<b>" + A.entier(s.g) + "</b>", "<b>" + A.euro(s.r) + "</b>", "", ""]) + "</div>");

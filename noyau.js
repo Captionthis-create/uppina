@@ -413,13 +413,13 @@
   // ---- Table de données : recherche, tri, colonnes, pagination (tout côté navigateur) ----
   // cfg = { colonnes:[{t,k,a,f(row),tri(row),cache}], lignes, rech:{ph,texte(row)}, pageSize, filtres:html, vide, total:[html..], onLigne(row) }
   App.monterTable = function (zone, cfg) {
-    var st = { q: "", page: 0, taille: cfg.pageSize || 10, tri: null, cachees: {}, filtres: [] };
+    var st = { q: (cfg.rech && cfg.rech.initial) || "", page: 0, taille: cfg.pageSize || 10, tri: null, cachees: {}, filtres: [] };
     (cfg.colonnes || []).forEach(function (c) { if (c.cache) st.cachees[c.t] = true; });
     var id = "td" + Math.floor(Math.random() * 1e6);
 
     zone.innerHTML =
       '<div class="td-barre">' +
-      (cfg.rech ? '<label class="champ-recherche">' + App.icones.loupe + '<input type="search" placeholder="' + E(cfg.rech.ph || "Rechercher...") + '" data-r></label>' : "") +
+      (cfg.rech ? '<label class="champ-recherche">' + App.icones.loupe + '<input type="search" placeholder="' + E(cfg.rech.ph || "Rechercher...") + '" value="' + E(st.q) + '" data-r></label>' : "") +
       (cfg.sansFiltrer ? "" : '<button class="bouton" data-filtrer>' + App.icones.plus + " Filtrer</button>") + (cfg.filtres || "") +
       '<span class="td-espace"></span>' + (cfg.droite || "") +
       (cfg.sansColonnes ? "" : '<div class="menu-conteneur"><button class="bouton" data-ouvre="' + id + '">' + App.icones.filtres + ' Colonnes</button>' +
