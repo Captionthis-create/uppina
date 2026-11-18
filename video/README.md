@@ -1,4 +1,4 @@
-# Vidéo « Une journée avec Up'Pina »
+# Vidéo « Les nouveautés de l'accueil Up'Pina »
 
 Vidéo de présentation de l'accueil d'Up'Pina (environ 3 min 30, 1920 × 1080, 30 images/s), destinée à la direction.
 Elle est **entièrement générée** à partir de la démo de ce dépôt : captures HD de la vraie interface, animées en
@@ -7,23 +7,47 @@ celles, simulées, de la démo (Crêperie Démo, Rennes).
 
 ## Le film
 
-Une journée de service, le samedi 21 novembre, racontée à la troisième personne :
+Neuf nouveautés, présentées une à une, toujours de la même façon : un carton « Nouveau », une présentation
+factuelle sur la vraie interface, puis un bandeau « L'avantage ». Une frise en haut de l'écran situe le module.
 
-| Moment | Ce qui est montré |
-| --- | --- |
-| Intro | Logo, date, Crêperie Démo |
-| **8h05 · Ouverture** | Accueil ; météo du jour et **score de clémence** (température 35 %, pluie 30 %, ensoleillement 25 %, vent 10 %) ; **CA attendu** (moyenne des mêmes jours de la semaine sur 8 semaines, corrigée par la météo) ; prévisions sur 16 jours ; objectif du mois ; réservations du jour |
-| **12h45 · Coup de feu** | Notifications d'encaissement et liste en direct ; CA, couverts, couvert moyen comparés au samedi précédent ; **stocks** : vente d'un Cidre doux 75cl (stock 3 → 2), alerte sur l'accueil et dans la cloche, tableau des stocks, historique des mouvements, saisie d'une livraison qui lève l'alerte |
-| **16h30 · Limonade** | Carte Midi / soir ; **créneaux de service** personnalisés (midi, limonade, soir) ; ventes par créneau ; création d'un **bon cadeau** de 50 € ; bons qui expirent sous 30 jours |
-| **19h30 · Service du soir** | Réservations du jour ; saisie d'une réservation (confirmation SMS) ; une table en retard passe en « Arrivé » |
-| **23h15 · Clôture** | Chiffres de la journée ; **Pop'IA** (3 questions : samedis midi, crêpes au goûter, top 10 du mois) ; **objectif** de novembre ; **export comptable** FEC |
-| Fin | Mosaïque des fonctionnalités, logo, mention « données simulées » |
+| Module | Présentation | L'avantage |
+| --- | --- | --- |
+| Intro | Logo, « Les nouveautés de l'accueil » | |
+| **01 · L'accueil en direct** | Notifications d'encaissement et liste en temps réel ; CA TTC et HT, couverts et couvert moyen comparés au même jour de la semaine précédente, à la même heure | Piloter le service d'un coup d'œil |
+| **02 · Météo et CA attendu** | **Score de clémence** sur 100 (température 35 %, pluie 30 %, ensoleillement 25 %, vent 10 %) ; **CA attendu** : moyenne des mêmes jours de la semaine, corrigée par la météo, sur 16 jours | Anticiper les commandes et le planning |
+| **03 · La gestion des stocks** | Vente d'un Cidre doux 75cl (stock 3 → 2, seuil 6) ; alerte sur l'accueil et dans la cloche ; tableau « À commander » et historique des mouvements ; saisie d'une livraison qui lève l'alerte | Moins de ruptures, des commandes au plus juste |
+| **04 · Les créneaux de service** | Journée découpée librement (service du midi, limonade, service du soir) ; ventes par créneau | Chaque moment de la journée mesuré |
+| **05 · Les réservations** | Réservations du jour (heure, couverts, statut, allergie) ; saisie avec confirmation par SMS ; passage en « Arrivé » d'un clic | Toute l'équipe sait qui arrive |
+| **06 · Les bons cadeaux** | Création d'un bon de 50 € (montant, validité, occasion, code unique) ; soldes à consommer ; bons qui expirent sous 30 jours | Plus de bons vendus, aucun solde oublié |
+| **07 · Les objectifs** | Objectif de CA ou de couverts sur une période ; avancement, écart avec le rythme attendu, projection de fin de mois | Savoir chaque jour où l'on en est |
+| **08 · L'assistant Pop'IA** | Trois questions : samedis midi des six dernières semaines, crêpes vendues au goûter, top 10 des produits du mois | Une réponse immédiate, sans chercher |
+| **09 · L'export comptable** | Écritures de la période au format FEC ou CSV, avec leurs contrôles | Prêt pour le cabinet comptable |
+| Fin | Mosaïque des neuf modules, logo, mention « données simulées », crédits de la voix | |
 
 Le texte de la voix off et des sous-titres est dans [`scenario.json`](scenario.json) (`texte` = sous-titre,
-`dit` = texte prononcé, écrit phonétiquement : « Eupe-pina », « Pop i a »).
+`dit` = texte prononcé, écrit phonétiquement : « Eupe-pina », « Pop i a », « F E C » ; `avantage` = texte du bandeau).
 
-La voix off est **Estelle**, voix française du modèle [Pocket TTS](https://huggingface.co/kyutai/pocket-tts-without-voice-cloning)
-de Kyutai (modèle français 24 couches), sous licence **CC-BY 4.0** : l'attribution figure au générique de fin.
+## La voix
+
+La voix se choisit dans le champ `voix` de `scenario.json`. Deux moteurs de [Kyutai](https://kyutai.org), qui
+tournent sur le processeur, sans service en ligne :
+
+| `moteur` | Modèle | `nom` | Vitesse |
+| --- | --- | --- | --- |
+| `pocket-tts` (par défaut) | [Pocket TTS](https://huggingface.co/kyutai/pocket-tts-without-voice-cloning), français 24 couches (`langue` : `french_24l`) | voix prédéfinie, ex. `estelle` | ≈ temps réel |
+| `kyutai-1.6b` | [Kyutai TTS 1.6B](https://huggingface.co/kyutai/tts-1.6b-en_fr) (français et anglais) | fichier de la banque [`kyutai/tts-voices`](https://huggingface.co/kyutai/tts-voices), ex. `cml-tts/fr/928_486_000075-0001_enhanced.wav` | ≈ 5 à 6 × le temps réel |
+
+Les modèles sont sous licence **CC-BY 4.0** ; les voix `cml-tts/fr` sont sous CC-BY 4.0, celles enregistrées par
+Kyutai (`unmute-prod-website`) sous CC0. Le champ `credit` est affiché au générique de fin : l'adapter quand on
+change de voix. Éviter les voix `expresso` (licence non commerciale).
+
+Le moteur `kyutai-1.6b` demande en plus le paquet `moshi`, dont les dépendances déclarées sont plus anciennes que
+celles de Pocket TTS ; l'installer sans elles :
+
+```bash
+.venv/bin/pip install --no-deps moshi==0.2.13
+.venv/bin/pip install "sphn>=0.2,<0.3" "sentencepiece>=0.2,<0.3" "einops>=0.7,<0.9" pyyaml
+```
 
 ## Fabriquer la vidéo
 
@@ -47,14 +71,14 @@ Résultat : `build/uppina-accueil.mp4` et `build/uppina-accueil.srt`. Le dossier
    l'horloge simulée avance par pas fixes : on retrouve exactement les mêmes encaissements à chaque lancement
    (dont la vente de 12h44 qui fait passer le Cidre doux 75cl de 3 à 2). Les appels météo sont coupés : la démo
    affiche sa météo simulée.
-2. `python voix.py` : voix off avec Pocket TTS (voix « Estelle »), une phrase par fichier, sur le processeur
-   (environ le temps réel). Chaque phrase est **contrôlée automatiquement** : Whisper (`large-v3-turbo`) la retranscrit,
-   et si l'écart avec le texte est trop grand ou si le débit est anormal, elle est régénérée avec une autre graine
-   (6 essais au plus, le meilleur est gardé). Les transcriptions sont dans `build/voix/controle.json`.
+2. `python voix.py` : voix off, une phrase par fichier. Chaque phrase est **contrôlée automatiquement** : Whisper
+   (`large-v3-turbo`) la retranscrit, et si l'écart avec le texte est trop grand ou si le débit est anormal, elle est
+   régénérée avec une autre graine (6 essais au plus, le meilleur est gardé). Les transcriptions sont dans
+   `build/voix/controle.json`.
 3. `node timeline.js` : place chaque phrase dans le temps et écrit le minutage et les sous-titres `.srt`.
-   [`durees-ecran.json`](durees-ecran.json) fixe la durée d'écran minimale de chaque phrase (celle du montage validé) :
-   une voix plus rapide garde le même montage, avec un peu plus de respiration.
-4. `python musique.py` : nappe musicale générée (ré majeur, 92 BPM), plus présente au coup de feu de midi.
+   La table `MIN_ECRAN` de `timeline.js` fixe la durée d'écran minimale des phrases qui portent une animation :
+   une voix plus rapide ne raccourcit pas les démonstrations.
+4. `python musique.py` : nappe musicale générée (ré majeur, 92 BPM), dont l'intensité suit les modules.
 5. `node rendu.js video` : rend la scène animée [`scene/`](scene/) image par image (Chromium) et l'encode en H.264.
    `node rendu.js apercu 12.5 47` produit des images isolées dans `build/apercu/` pour vérifier le montage.
 6. `python mixage.py` puis l'assemblage ffmpeg de `fabriquer.sh` : voix + musique (baissée sous la voix),
@@ -63,5 +87,5 @@ Résultat : `build/uppina-accueil.mp4` et `build/uppina-accueil.srt`. Le dossier
 ## Modifier
 
 - **Le texte** : `scenario.json`, puis `python voix.py <id>` pour les phrases changées, puis `./fabriquer.sh rendu`.
-- **Le montage** : `scene/film.js` (une fonction par moment de la journée, calée sur le minutage des phrases).
-- **Les temps morts** après une phrase (pour laisser jouer une animation) : table `APRES` de `timeline.js`.
+- **Le montage** : `scene/film.js` (une fonction par module, calée sur le minutage des phrases).
+- **Les temps morts** après une phrase (cartons, bandeaux « L'avantage ») : table `APRES` de `timeline.js`.

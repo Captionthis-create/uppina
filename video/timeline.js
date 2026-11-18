@@ -1,6 +1,7 @@
 /*
  * timeline.js : place chaque phrase de la voix off dans le temps.
  * Entrées : scenario.json, build/voix/durees.json, build/captures/captures.json
+ * Usage   : node timeline.js            (node timeline.js --estimer : estime les durées des phrases sans voix)
  * Sorties : build/timeline.json (minutage), build/timeline.js (même chose + captures, pour la scène animée),
  *           build/uppina-accueil.srt (sous-titres)
  */
@@ -11,22 +12,23 @@ const ICI = __dirname;
 const sc = JSON.parse(fs.readFileSync(path.join(ICI, "scenario.json"), "utf8"));
 const durees = JSON.parse(fs.readFileSync(path.join(ICI, "build", "voix", "durees.json"), "utf8"));
 const captures = JSON.parse(fs.readFileSync(path.join(ICI, "build", "captures", "captures.json"), "utf8"));
-// Créneau minimal de chaque phrase à l'écran (montage validé) : une voix plus courte n'avance pas les animations
-const CRENEAUX = fs.existsSync(path.join(ICI, "durees-ecran.json")) ? JSON.parse(fs.readFileSync(path.join(ICI, "durees-ecran.json"), "utf8")).durees : {};
-
+const ESTIMER = process.argv.includes("--estimer");  // durées manquantes estimées (aperçu avant la voix)
+const estimees = [];
 const FPS = 30;
 const AMORCE = 2.4;        // animation du logo avant la première phrase
 const ECART = 0.35;        // silence entre deux phrases d'une même séquence
 const TRANSITION = 1.15;   // silence entre deux séquences (titre de l'heure)
 const FIN = 5.2;           // générique après la dernière phrase
-// Temps supplémentaire après certaines phrases, pour laisser jouer l'animation
+// Durée d'écran minimale de certaines phrases (s, depuis leur début) : le temps que jouent leurs animations
+const MIN_ECRAN = {
+  a2: 6.0, a3: 5.6, b2: 5.6, b3: 7.6, c2: 7.2, c3: 6.2, c4: 5.4, e2: 6.2, e3: 3.6,
+  r2: 6.8, r3: 7.2, r4: 4.6, g2: 7.6, g3: 4.4, o2: 4.6, o3: 5.2, p1: 3.0, p2: 6.0, p3: 4.4, p4: 4.4, x2: 7.0
+};
+// Temps supplémentaire après certaines phrases : cartons, bandeaux « L'avantage »
 const APRES = {
   i2: 0.9,
-  m1: 0.2, m2: 0.2, m3: 0.6, m4: 0.4, m5: 0.3, m6: 0.2, m7: 0.3,
-  d1: 0.2, d2: 1.1, d3: 0.3, d5: 0.2, d6: 0.9, d7: 0.8, d8: 1.0,
-  a1: 0.2, a2: 0.6, a3: 0.5, a4: 0.4, a5: 1.0, a6: 0.4,
-  s1: 0.2, s2: 0.4, s3: 0.8, s4: 1.2,
-  n1: 0.3, n2: 0.7, n3: 1.6, n4: 1.3, n5: 1.3, n6: 0.5, n7: 1.6
+  a1: 0.2, b1: 0.2, c1: 0.2, e1: 0.2, r1: 0.2, g1: 0.2, o1: 0.2, x1: 0.2,
+  a4: 1.2, b4: 1.2, c5: 1.2, e4: 1.2, r5: 1.2, g4: 1.2, o4: 1.2, p5: 1.2, x3: 1.6
 };
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
@@ -42,57 +44,77 @@ sc.scenes.forEach(function (s, i) {
   const debutScene = i === 0 ? 0 : t - 0.75;
   s.beats.forEach(function (b, j) {
     if (j > 0) t += ECART;
-    const d = durees[b.id];
-    if (d === undefined) throw new Error("Durée manquante pour " + b.id + " : relancer voix.py");
-    const creneau = Math.max(d, CRENEAUX[b.id] || 0);
+    let d = durees[b.id];
+    if (d === undefined && ESTIMER) {
+      // Aperçu du montage avant la voix : environ 2,9 mots par seconde
+      d = r3(b.dit.split(/\s+/).length / 2.9 + 0.3);
+      estimees.push(b.id);
+    }
+    if (d === undefined) throw new Error("Durée manquante pour " + b.id + " : relancer voix.py (ou node timeline.js --estimer)");
+    const creneau = Math.max(d, MIN_ECRAN[b.id] || 0);
     // fin = fin du créneau (repère des animations) ; finVoix = fin réelle de la phrase (sous-titres)
     beats[b.id] = { debut: r3(t), fin: r3(t + creneau), finVoix: r3(t + d), scene: s.id, texte: typo(b.texte) };
     ordre.push(b.id);
     t += creneau + (APRES[b.id] || 0);
   });
-  scenes.push({ id: s.id, heure: s.heure, titre: s.titre, debut: r3(debutScene) });
+  scenes.push({ id: s.id, num: s.num || null, titre: s.titre, court: s.court || null, avantage: s.avantage || null, debut: r3(debutScene) });
 });
 const duree = r3(t + FIN);
 scenes.forEach(function (s, i) { s.fin = i + 1 < scenes.length ? scenes[i + 1].debut : duree; });
 
-const timeline = { fps: FPS, duree, images: Math.ceil(duree * FPS), scenes, beats, ordre };
-fs.writeFileSync(path.join(ICI, "build", "timeline.json"), JSON.stringify(timeline, null, 1));
-fs.writeFileSync(path.join(ICI, "build", "timeline.js"),
-  "window.TIMELINE = " + JSON.stringify(timeline) + ";\nwindow.CAPTURES = " + JSON.stringify(captures.captures) + ";\nwindow.TEXTES = " + JSON.stringify(captures.textes) + ";\n");
-
-// Sous-titres .srt (deux lignes au plus, coupées près du milieu)
-function hms(x) {
-  const ms = Math.round(x * 1000), h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
-  return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0") + "," + String(ms % 1000).padStart(3, "0");
-}
-function coupe(txt, n) {
-  // Coupe en n morceaux équilibrés, de préférence après une ponctuation ; jamais sur une espace insécable
+// Sous-titres : chaque phrase est découpée en cartons (au prorata des caractères pour le minutage),
+// chaque carton en deux lignes au plus, coupées près du milieu, de préférence après une ponctuation.
+// Mots-outils : on préfère couper avant eux, jamais juste après
+const OUTILS = /^(de|du|des|la|le|les|un|une|d'un|d'une|et|ou|à|au|aux|en|sur|par|pour|dans|avec|sans|sous|qui|que|se|si|sa|son|ses|sont|est|ce)$/i;
+function coupe(txt) {
+  // Coupe en 2 morceaux : longueurs équilibrées, de préférence après une ponctuation (si les deux morceaux restent
+  // consistants) ou avant un mot-outil ; jamais sur une espace insécable
   const mots = txt.split(" ");
-  if (n === 1 || mots.length < 2) return [txt];
+  if (mots.length < 2) return [txt];
   let best = null;
   for (let k = 1; k < mots.length; k++) {
     const a = mots.slice(0, k).join(" "), b = mots.slice(k).join(" ");
-    const cout = Math.abs(a.length - b.length) - (/[,:;.…]$/.test(a) ? 12 : 0);
+    const consistant = Math.min(a.length, b.length) >= 0.3 * txt.length;
+    const cout = Math.abs(a.length - b.length)
+      - (consistant && /[.:;…]$/.test(a) ? 30 : consistant && /,$/.test(a) ? 16 : 0)
+      - (OUTILS.test(mots[k]) ? 6 : 0) + (OUTILS.test(mots[k - 1]) ? 12 : 0);
     if (!best || cout < best.cout) best = { cout, parts: [a, b] };
   }
   return best.parts;
 }
-const cues = [];
-ordre.forEach(function (id, i) {
-  const b = beats[id];
-  const suivant = ordre[i + 1] ? beats[ordre[i + 1]].debut : duree;
-  const fin = Math.min(b.finVoix + 0.6, suivant - 0.05);
-  const morceaux = b.texte.length > 84 ? coupe(b.texte, 2) : [b.texte];
-  let t0 = b.debut;
-  morceaux.forEach(function (m, j) {
-    const t1 = j === morceaux.length - 1 ? fin : b.debut + (b.finVoix - b.debut) * (morceaux.slice(0, j + 1).join(" ").length / b.texte.length);
-    const lignes = m.length > 42 ? coupe(m, 2).join("\n") : m;
-    cues.push({ debut: t0, fin: t1, texte: lignes.replace(/\u00a0/g, " ") });
-    t0 = t1 + 0.04;
+function decouper(maxCarton, maxLigne, ecartCartons) {
+  const cartons = [];
+  ordre.forEach(function (id, i) {
+    const b = beats[id];
+    const suivant = ordre[i + 1] ? beats[ordre[i + 1]].debut : duree;
+    const fin = Math.min(b.finVoix + 0.6, suivant - 0.05);
+    const morceaux = b.texte.length > maxCarton ? coupe(b.texte) : [b.texte];
+    let t0 = b.debut;
+    morceaux.forEach(function (m, j) {
+      const t1 = j === morceaux.length - 1 ? fin : b.debut + (b.finVoix - b.debut) * (morceaux.slice(0, j + 1).join(" ").length / b.texte.length);
+      cartons.push({ debut: r3(t0), fin: r3(t1), lignes: m.length > maxLigne ? coupe(m) : [m], suite: j > 0, coupe: j < morceaux.length - 1 });
+      t0 = t1 + ecartCartons;
+    });
   });
-});
-const srt = cues.map(function (c, i) { return (i + 1) + "\n" + hms(c.debut) + " --> " + hms(c.fin) + "\n" + c.texte + "\n"; }).join("\n");
+  return cartons;
+}
+// .srt : normes usuelles (42 caractères par ligne, 2 lignes) ; incrustés : lignes plus longues, l'écran est large
+const cartonsSrt = decouper(84, 42, 0.04), cartonsFilm = decouper(110, 56, 0);
+
+const timeline = { fps: FPS, duree, images: Math.ceil(duree * FPS), titre: sc.titre, creditVoix: sc.voix.credit || "", scenes, beats, ordre, soustitres: cartonsFilm };
+fs.writeFileSync(path.join(ICI, "build", "timeline.json"), JSON.stringify(timeline, null, 1));
+fs.writeFileSync(path.join(ICI, "build", "timeline.js"),
+  "window.TIMELINE = " + JSON.stringify(timeline) + ";\nwindow.CAPTURES = " + JSON.stringify(captures.captures) + ";\nwindow.TEXTES = " + JSON.stringify(captures.textes) + ";\n");
+
+function hms(x) {
+  const ms = Math.round(x * 1000), h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
+  return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0") + "," + String(ms % 1000).padStart(3, "0");
+}
+const srt = cartonsSrt.map(function (c, i) {
+  return (i + 1) + "\n" + hms(c.debut) + " --> " + hms(c.fin) + "\n" + c.lignes.join("\n").replace(/\u00a0/g, " ") + "\n";
+}).join("\n");
 fs.writeFileSync(path.join(ICI, "build", "uppina-accueil.srt"), srt);
 
+if (estimees.length) console.log("⚠ Durées estimées (voix pas encore générée) : " + estimees.join(" "));
 console.log("Durée : " + Math.floor(duree / 60) + " min " + (duree % 60).toFixed(1) + " s (" + timeline.images + " images)");
-scenes.forEach(function (s) { console.log("  " + s.id.padEnd(6) + " " + s.debut.toFixed(2).padStart(7) + " → " + s.fin.toFixed(2).padStart(7)); });
+scenes.forEach(function (s) { console.log("  " + s.id.padEnd(9) + " " + s.debut.toFixed(2).padStart(7) + " → " + s.fin.toFixed(2).padStart(7)); });

@@ -1,229 +1,308 @@
 {
-  "titre": "Une journée avec Up'Pina",
+  "titre": "Les nouveautés de l'accueil Up'Pina",
   "voix": {
-    "moteur": "Pocket TTS (Kyutai)",
+    "moteur": "pocket-tts",
     "langue": "french_24l",
     "nom": "estelle",
-    "licence": "CC-BY 4.0"
+    "credit": "Voix de synthèse : Pocket TTS, Kyutai (CC-BY 4.0)"
   },
-  "note": "texte = sous-titre affiché ; dit = texte envoyé à la synthèse vocale (orthographe phonétique : Eupe-pina, Pop i a, F E C).",
+  "note": "Chaque module : un carton « Nouveau », une présentation factuelle, puis « L'avantage ». texte = sous-titre affiché ; dit = texte envoyé à la synthèse vocale (orthographe phonétique : Eupe-pina, Pop i a, F E C). avantage = texte court du bandeau.",
   "scenes": [
     {
       "id": "intro",
-      "heure": null,
-      "titre": "Une journée avec Up'Pina",
+      "titre": "Les nouveautés de l'accueil",
       "beats": [
         {
           "id": "i1",
-          "texte": "Samedi 21 novembre, à Rennes.",
-          "dit": "Samedi vingt et un novembre, à Rennes."
+          "texte": "Up'Pina : les nouveautés de l'accueil.",
+          "dit": "Eupe-pina : les nouveautés de l'accueil."
         },
         {
           "id": "i2",
-          "texte": "Une journée à la Crêperie Démo, vue depuis l'accueil d'Up'Pina.",
-          "dit": "Une journée à la Crêperie Démo, vue depuis l'accueil d'Eupe-pina."
+          "texte": "Neuf modules, présentés sur la démonstration de la Crêperie Démo, à Rennes.",
+          "dit": "Neuf modules, présentés sur la démonstration de la Crêperie Démo, à Rennes."
         }
       ]
     },
     {
-      "id": "matin",
-      "heure": "8h05",
-      "titre": "Ouverture",
-      "beats": [
-        {
-          "id": "m1",
-          "texte": "8 h 05. La caisse vient d'ouvrir : le restaurateur consulte son accueil.",
-          "dit": "Huit heures cinq. La caisse vient d'ouvrir : le restaurateur consulte son accueil."
-        },
-        {
-          "id": "m2",
-          "texte": "La météo du jour s'affiche, avec un score de clémence sur 100.",
-          "dit": "La météo du jour s'affiche, avec un score de clémence sur cent."
-        },
-        {
-          "id": "m3",
-          "texte": "Ce score combine la température, la pluie, l'ensoleillement et le vent.",
-          "dit": "Ce score combine la température, la pluie, l'ensoleillement et le vent."
-        },
-        {
-          "id": "m4",
-          "texte": "Up'Pina en déduit le chiffre d'affaires attendu : la moyenne des mêmes jours de la semaine, corrigée par la météo.",
-          "dit": "Eupe-pina en déduit le chiffre d'affaires attendu : la moyenne des mêmes jours de la semaine, corrigée par la météo."
-        },
-        {
-          "id": "m5",
-          "texte": "Sur 16 jours, il anticipe ainsi ses commandes et son équipe.",
-          "dit": "Sur seize jours, il anticipe ainsi ses commandes et son équipe."
-        },
-        {
-          "id": "m6",
-          "texte": "Son objectif du mois : 71 %, en avance sur le rythme attendu.",
-          "dit": "Son objectif du mois : soixante et onze pour cent, en avance sur le rythme attendu."
-        },
-        {
-          "id": "m7",
-          "texte": "Et ses réservations du jour : 23 tables, 93 couverts.",
-          "dit": "Et ses réservations du jour : vingt-trois tables, quatre-vingt-treize couverts."
-        }
-      ]
-    },
-    {
-      "id": "midi",
-      "heure": "12h45",
-      "titre": "Coup de feu",
-      "beats": [
-        {
-          "id": "d1",
-          "texte": "12 h 45. C'est le coup de feu.",
-          "dit": "Midi quarante-cinq. C'est le coup de feu."
-        },
-        {
-          "id": "d2",
-          "texte": "Chaque encaissement remonte en direct : une notification apparaît, et la liste se met à jour.",
-          "dit": "Chaque encaissement remonte en direct : une notification apparaît, et la liste se met à jour."
-        },
-        {
-          "id": "d3",
-          "texte": "Chiffre d'affaires, couverts, couvert moyen : tout est comparé au samedi précédent, à la même heure.",
-          "dit": "Chiffre d'affaires, couverts, couvert moyen : tout est comparé au samedi précédent, à la même heure."
-        },
-        {
-          "id": "d5",
-          "texte": "Côté stocks, chaque vente décompte automatiquement les quantités.",
-          "dit": "Côté stocks, chaque vente décompte automatiquement les quantités."
-        },
-        {
-          "id": "d6",
-          "texte": "Quand un produit passe sous son seuil de réapprovisionnement, une alerte apparaît sur l'accueil et dans la cloche.",
-          "dit": "Quand un produit passe sous son seuil de réapprovisionnement, une alerte apparaît sur l'accueil et dans la cloche."
-        },
-        {
-          "id": "d7",
-          "texte": "Dans le tableau des stocks, il voit ce qui est à commander, et l'historique de chaque mouvement.",
-          "dit": "Dans le tableau des stocks, il voit ce qui est à commander, et l'historique de chaque mouvement."
-        },
-        {
-          "id": "d8",
-          "texte": "La livraison arrive : il l'enregistre, le stock remonte, et l'alerte disparaît.",
-          "dit": "La livraison arrive : il l'enregistre, le stock remonte, et l'alerte disparaît."
-        }
-      ]
-    },
-    {
-      "id": "aprem",
-      "heure": "16h30",
-      "titre": "Limonade",
+      "id": "accueil",
+      "num": "01",
+      "titre": "L'accueil en direct",
+      "court": "Accueil",
+      "avantage": "Piloter le service d'un coup d'œil",
       "beats": [
         {
           "id": "a1",
-          "texte": "16 h 30. Le service du midi est terminé : la carte Midi / soir en fait déjà le bilan.",
-          "dit": "Seize heures trente. Le service du midi est terminé : la carte midi soir en fait déjà le bilan."
+          "texte": "Nouveau : l'accueil en direct.",
+          "dit": "Nouveau : l'accueil en direct."
         },
         {
           "id": "a2",
-          "texte": "Mais chaque restaurant a son rythme : ici, la journée compte trois créneaux de service, le midi, la limonade et le soir.",
-          "dit": "Mais chaque restaurant a son rythme : ici, la journée compte trois créneaux de service, le midi, la limonade et le soir."
+          "texte": "Chaque encaissement remonte en temps réel : une notification apparaît, et la liste se met à jour.",
+          "dit": "Chaque encaissement remonte en temps réel : une notification apparaît, et la liste se met à jour."
         },
         {
           "id": "a3",
-          "texte": "Les horaires se règlent librement, et les ventes se lisent ensuite créneau par créneau.",
-          "dit": "Les horaires se règlent librement, et les ventes se lisent ensuite créneau par créneau."
+          "texte": "Chiffre d'affaires TTC et HT, couverts et couvert moyen sont comparés au même jour de la semaine précédente, à la même heure.",
+          "dit": "Chiffre d'affaires TTC et hors taxes, couverts et couvert moyen sont comparés au même jour de la semaine précédente, à la même heure."
         },
         {
           "id": "a4",
-          "texte": "Au comptoir, un client achète un bon cadeau de 50 €.",
-          "dit": "Au comptoir, un client achète un bon cadeau de cinquante euros."
-        },
-        {
-          "id": "a5",
-          "texte": "Montant, validité, occasion : le bon est créé en quelques secondes, avec son code unique.",
-          "dit": "Montant, validité, occasion : le bon est créé en quelques secondes, avec son code unique."
-        },
-        {
-          "id": "a6",
-          "texte": "Le restaurateur suit les soldes à consommer, et les bons qui expirent dans les 30 jours.",
-          "dit": "Le restaurateur suit les soldes à consommer, et les bons qui expirent dans les trente jours."
+          "texte": "L'avantage : le service se pilote d'un coup d'œil, sans ouvrir les rapports.",
+          "dit": "L'avantage : le service se pilote d'un coup d'œil, sans ouvrir les rapports."
         }
       ]
     },
     {
-      "id": "soir",
-      "heure": "19h30",
-      "titre": "Service du soir",
+      "id": "meteo",
+      "num": "02",
+      "titre": "Météo et CA attendu",
+      "court": "Météo",
+      "avantage": "Anticiper les commandes et le planning",
       "beats": [
         {
-          "id": "s1",
-          "texte": "19 h 30. Le service du soir commence.",
-          "dit": "Dix-neuf heures trente. Le service du soir commence."
+          "id": "b1",
+          "texte": "Nouveau : la météo et le chiffre d'affaires attendu.",
+          "dit": "Nouveau : la météo et le chiffre d'affaires attendu."
         },
         {
-          "id": "s2",
-          "texte": "Toutes les réservations du jour sont réunies : heure, couverts, statut, et notes utiles comme une allergie.",
-          "dit": "Toutes les réservations du jour sont réunies : heure, couverts, statut, et notes utiles comme une allergie."
+          "id": "b2",
+          "texte": "Chaque jour reçoit un score de clémence sur 100, qui combine température, pluie, ensoleillement et vent.",
+          "dit": "Chaque jour reçoit un score de clémence sur cent, qui combine température, pluie, ensoleillement et vent."
         },
         {
-          "id": "s3",
-          "texte": "Un appel : une table de quatre pour 21 h. La réservation est saisie, et le client reçoit sa confirmation par SMS.",
-          "dit": "Un appel : une table de quatre pour vingt et une heures. La réservation est saisie, et le client reçoit sa confirmation par SMS."
+          "id": "b3",
+          "texte": "Up'Pina en déduit le chiffre d'affaires attendu : la moyenne des mêmes jours de la semaine, corrigée par la météo, sur 16 jours.",
+          "dit": "Eupe-pina en déduit le chiffre d'affaires attendu : la moyenne des mêmes jours de la semaine, corrigée par la météo, sur seize jours."
         },
         {
-          "id": "s4",
-          "texte": "Une table en retard se présente : un clic, et la réservation passe en « Arrivé ».",
-          "dit": "Une table en retard se présente : un clic, et la réservation passe en arrivé."
+          "id": "b4",
+          "texte": "L'avantage : les commandes et le planning de l'équipe s'anticipent.",
+          "dit": "L'avantage : les commandes et le planning de l'équipe s'anticipent."
         }
       ]
     },
     {
-      "id": "nuit",
-      "heure": "23h15",
-      "titre": "Clôture",
+      "id": "stocks",
+      "num": "03",
+      "titre": "La gestion des stocks",
+      "court": "Stocks",
+      "avantage": "Moins de ruptures, des commandes au plus juste",
       "beats": [
         {
-          "id": "n1",
-          "texte": "23 h 15. La caisse est clôturée : 4 976 € de chiffre d'affaires, 6 % de plus que samedi dernier.",
-          "dit": "Vingt-trois heures quinze. La caisse est clôturée : quatre mille neuf cent soixante-seize euros de chiffre d'affaires, six pour cent de plus que samedi dernier."
+          "id": "c1",
+          "texte": "Nouveau : la gestion des stocks.",
+          "dit": "Nouveau : la gestion des stocks."
         },
         {
-          "id": "n2",
-          "texte": "Pour analyser sa journée, il interroge Pop'IA, l'assistant intégré, en français.",
-          "dit": "Pour analyser sa journée, il interroge Pop i a, l'assistant intégré, en français."
+          "id": "c2",
+          "texte": "Chaque vente décompte les quantités. Sous le seuil de réapprovisionnement, une alerte s'affiche sur l'accueil et dans la cloche.",
+          "dit": "Chaque vente décompte les quantités. Sous le seuil de réapprovisionnement, une alerte s'affiche sur l'accueil et dans la cloche."
         },
         {
-          "id": "n3",
-          "texte": "Ses samedis midi des six dernières semaines…",
-          "dit": "Ses samedis midi des six dernières semaines…"
+          "id": "c3",
+          "texte": "Le tableau des stocks montre ce qui est à commander, avec l'historique de chaque mouvement.",
+          "dit": "Le tableau des stocks montre ce qui est à commander, avec l'historique de chaque mouvement."
         },
         {
-          "id": "n4",
-          "texte": "… les crêpes vendues au goûter, sur le créneau de la limonade…",
-          "dit": "les crêpes vendues au goûter, sur le créneau de la limonade…"
+          "id": "c4",
+          "texte": "Une livraison s'enregistre en quelques secondes, et l'alerte disparaît.",
+          "dit": "Une livraison s'enregistre en quelques secondes, et l'alerte disparaît."
         },
         {
-          "id": "n5",
-          "texte": "… ou le top 10 des produits du mois : la réponse arrive en chiffres et en graphique.",
-          "dit": "ou le top dix des produits du mois : la réponse arrive en chiffres et en graphique."
+          "id": "c5",
+          "texte": "L'avantage : moins de ruptures, et des commandes au plus juste.",
+          "dit": "L'avantage : moins de ruptures, et des commandes au plus juste."
+        }
+      ]
+    },
+    {
+      "id": "creneaux",
+      "num": "04",
+      "titre": "Les créneaux de service",
+      "court": "Créneaux",
+      "avantage": "Chaque moment de la journée mesuré",
+      "beats": [
+        {
+          "id": "e1",
+          "texte": "Nouveau : les créneaux de service.",
+          "dit": "Nouveau : les créneaux de service."
         },
         {
-          "id": "n6",
-          "texte": "L'objectif de novembre se met à jour : 6 026 € d'avance, et une projection à 109 %.",
-          "dit": "L'objectif de novembre se met à jour : six mille vingt-six euros d'avance, et une projection à cent neuf pour cent."
+          "id": "e2",
+          "texte": "La journée se découpe librement : par exemple, service du midi, limonade et service du soir.",
+          "dit": "La journée se découpe librement : par exemple, service du midi, limonade, et service du soir."
         },
         {
-          "id": "n7",
-          "texte": "Enfin, l'export comptable prépare les écritures du mois au format FEC, prêtes pour le cabinet comptable.",
-          "dit": "Enfin, l'export comptable prépare les écritures du mois au format F E C, prêtes pour le cabinet comptable."
+          "id": "e3",
+          "texte": "Les ventes se lisent ensuite créneau par créneau.",
+          "dit": "Les ventes se lisent ensuite créneau par créneau."
+        },
+        {
+          "id": "e4",
+          "texte": "L'avantage : chaque moment de la journée est analysé selon le rythme du restaurant.",
+          "dit": "L'avantage : chaque moment de la journée est analysé selon le rythme du restaurant."
+        }
+      ]
+    },
+    {
+      "id": "resas",
+      "num": "05",
+      "titre": "Les réservations",
+      "court": "Réservations",
+      "avantage": "Toute l'équipe sait qui arrive",
+      "beats": [
+        {
+          "id": "r1",
+          "texte": "Nouveau : les réservations, directement sur l'accueil.",
+          "dit": "Nouveau : les réservations, directement sur l'accueil."
+        },
+        {
+          "id": "r2",
+          "texte": "Celles du jour sont réunies : heure, couverts, statut, et notes utiles comme une allergie.",
+          "dit": "Celles du jour sont réunies : heure, couverts, statut, et notes utiles comme une allergie."
+        },
+        {
+          "id": "r3",
+          "texte": "Une réservation se saisit en quelques secondes, et le client reçoit sa confirmation par SMS.",
+          "dit": "Une réservation se saisit en quelques secondes, et le client reçoit sa confirmation par SMS."
+        },
+        {
+          "id": "r4",
+          "texte": "À l'arrivée, un clic suffit pour changer son statut.",
+          "dit": "À l'arrivée, un clic suffit pour changer son statut."
+        },
+        {
+          "id": "r5",
+          "texte": "L'avantage : toute l'équipe sait qui arrive, et quand.",
+          "dit": "L'avantage : toute l'équipe sait qui arrive, et quand."
+        }
+      ]
+    },
+    {
+      "id": "bons",
+      "num": "06",
+      "titre": "Les bons cadeaux",
+      "court": "Bons cadeaux",
+      "avantage": "Plus de bons vendus, aucun solde oublié",
+      "beats": [
+        {
+          "id": "g1",
+          "texte": "Nouveau : les bons cadeaux.",
+          "dit": "Nouveau : les bons cadeaux."
+        },
+        {
+          "id": "g2",
+          "texte": "Créer un bon ne prend qu'un instant : montant, validité, occasion, et un code unique.",
+          "dit": "Créer un bon ne prend qu'un instant : montant, validité, occasion, et un code unique."
+        },
+        {
+          "id": "g3",
+          "texte": "Les soldes à consommer et les bons qui expirent sous 30 jours sont suivis en permanence.",
+          "dit": "Les soldes à consommer et les bons qui expirent sous trente jours sont suivis en permanence."
+        },
+        {
+          "id": "g4",
+          "texte": "L'avantage : plus de bons vendus, et aucun solde oublié.",
+          "dit": "L'avantage : plus de bons vendus, et aucun solde oublié."
+        }
+      ]
+    },
+    {
+      "id": "objectifs",
+      "num": "07",
+      "titre": "Les objectifs",
+      "court": "Objectifs",
+      "avantage": "Savoir chaque jour où l'on en est",
+      "beats": [
+        {
+          "id": "o1",
+          "texte": "Nouveau : les objectifs.",
+          "dit": "Nouveau : les objectifs."
+        },
+        {
+          "id": "o2",
+          "texte": "Un objectif de chiffre d'affaires ou de couverts se fixe sur la période de son choix.",
+          "dit": "Un objectif de chiffre d'affaires ou de couverts se fixe sur la période de son choix."
+        },
+        {
+          "id": "o3",
+          "texte": "L'accueil affiche l'avancement, l'écart avec le rythme attendu et la projection en fin de mois.",
+          "dit": "L'accueil affiche l'avancement, l'écart avec le rythme attendu, et la projection en fin de mois."
+        },
+        {
+          "id": "o4",
+          "texte": "L'avantage : savoir chaque jour si l'on est en avance, ou en retard.",
+          "dit": "L'avantage : savoir chaque jour si l'on est en avance, ou en retard."
+        }
+      ]
+    },
+    {
+      "id": "popia",
+      "num": "08",
+      "titre": "L'assistant Pop'IA",
+      "court": "Pop'IA",
+      "avantage": "Une réponse immédiate, sans chercher",
+      "beats": [
+        {
+          "id": "p1",
+          "texte": "Nouveau : l'assistant Pop'IA.",
+          "dit": "Nouveau : l'assistant Pop i a."
+        },
+        {
+          "id": "p2",
+          "texte": "On lui pose une question en français : les samedis midi des six dernières semaines…",
+          "dit": "On lui pose une question en français : les samedis midi des six dernières semaines…"
+        },
+        {
+          "id": "p3",
+          "texte": "… les crêpes vendues au goûter…",
+          "dit": "les crêpes vendues au goûter…"
+        },
+        {
+          "id": "p4",
+          "texte": "… ou le top 10 des produits du mois.",
+          "dit": "ou le top dix des produits du mois."
+        },
+        {
+          "id": "p5",
+          "texte": "L'avantage : la réponse arrive en chiffres et en graphique, sans chercher dans les rapports.",
+          "dit": "L'avantage : la réponse arrive en chiffres et en graphique, sans chercher dans les rapports."
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "num": "09",
+      "titre": "L'export comptable",
+      "court": "Export",
+      "avantage": "Prêt pour le cabinet comptable",
+      "beats": [
+        {
+          "id": "x1",
+          "texte": "Nouveau : l'export comptable.",
+          "dit": "Nouveau : l'export comptable."
+        },
+        {
+          "id": "x2",
+          "texte": "Les écritures de la période sont préparées au format FEC ou CSV, avec leurs contrôles.",
+          "dit": "Les écritures de la période sont préparées au format F E C ou C S V, avec leurs contrôles."
+        },
+        {
+          "id": "x3",
+          "texte": "L'avantage : un fichier prêt pour le cabinet comptable, sans ressaisie.",
+          "dit": "L'avantage : un fichier prêt pour le cabinet comptable, sans ressaisie."
         }
       ]
     },
     {
       "id": "fin",
-      "heure": null,
       "titre": "Up'Pina",
       "beats": [
         {
           "id": "f1",
-          "texte": "De l'ouverture à la clôture, l'accueil d'Up'Pina réunit tout le service, au même endroit.",
-          "dit": "De l'ouverture à la clôture, l'accueil d'Eupe-pina réunit tout le service, au même endroit."
+          "texte": "Neuf nouveautés, un seul accueil : tout le service, au même endroit.",
+          "dit": "Neuf nouveautés, un seul accueil : tout le service, au même endroit."
         }
       ]
     }

@@ -2,7 +2,8 @@
 musique.py : nappe musicale générée (aucun échantillon externe), calée sur les séquences du film.
 
 Ré majeur, 92 BPM : nappe d'accords (I–vi–IV–V), arpèges doux, basse, et une pulsation légère
-pendant le « coup de feu » de midi. Réverbération par convolution. Résolution sur l'accord final.
+sur les modules les plus vivants (accueil en direct, stocks, réservations). Réverbération par convolution.
+Résolution sur l'accord final.
 Entrée  : build/timeline.json
 Sortie  : build/musique.wav (48 kHz, stéréo, 32 bits flottants)
 """
@@ -109,14 +110,18 @@ def charleston():
     return bruit * np.exp(-t * 55)
 
 
-# Niveau de chaque couche selon la séquence (fondus de 1,5 s entre séquences)
+# Niveau de chaque couche selon le module (fondus de 1,5 s entre modules)
 NIVEAUX = {
     "intro": {"nappe": 0.85, "arpege": 0.0, "basse": 0.25, "percu": 0.0},
-    "matin": {"nappe": 0.75, "arpege": 0.45, "basse": 0.5, "percu": 0.0},
-    "midi": {"nappe": 0.65, "arpege": 0.62, "basse": 0.62, "percu": 0.55},
-    "aprem": {"nappe": 0.75, "arpege": 0.42, "basse": 0.5, "percu": 0.0},
-    "soir": {"nappe": 0.8, "arpege": 0.34, "basse": 0.52, "percu": 0.0},
-    "nuit": {"nappe": 0.75, "arpege": 0.42, "basse": 0.5, "percu": 0.12},
+    "accueil": {"nappe": 0.68, "arpege": 0.55, "basse": 0.58, "percu": 0.42},
+    "meteo": {"nappe": 0.78, "arpege": 0.4, "basse": 0.5, "percu": 0.0},
+    "stocks": {"nappe": 0.68, "arpege": 0.55, "basse": 0.6, "percu": 0.32},
+    "creneaux": {"nappe": 0.76, "arpege": 0.44, "basse": 0.52, "percu": 0.12},
+    "resas": {"nappe": 0.66, "arpege": 0.58, "basse": 0.6, "percu": 0.45},
+    "bons": {"nappe": 0.8, "arpege": 0.38, "basse": 0.5, "percu": 0.0},
+    "objectifs": {"nappe": 0.72, "arpege": 0.5, "basse": 0.56, "percu": 0.22},
+    "popia": {"nappe": 0.78, "arpege": 0.46, "basse": 0.5, "percu": 0.1},
+    "export": {"nappe": 0.76, "arpege": 0.42, "basse": 0.5, "percu": 0.08},
     "fin": {"nappe": 0.95, "arpege": 0.5, "basse": 0.55, "percu": 0.0},
 }
 

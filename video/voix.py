@@ -1,6 +1,10 @@
 """
-voix.py : synthèse de la voix off avec Pocket TTS (Kyutai, modèle français 24 couches, voix « Estelle »),
-une phrase par fichier, avec contrôle automatique de chaque phrase par reconnaissance vocale (Whisper).
+voix.py : synthèse de la voix off, une phrase par fichier, avec contrôle automatique de chaque phrase
+par reconnaissance vocale (Whisper). Deux moteurs de Kyutai, au choix dans scenario.json (« voix ») :
+  - « pocket-tts »  : Pocket TTS, modèle français 24 couches (« langue »), voix prédéfinie (« nom », ex. estelle) ;
+                      environ le temps réel sur processeur.
+  - « kyutai-1.6b » : Kyutai TTS 1.6B (en_fr), voix de la banque kyutai/tts-voices (« nom », ex.
+                      cml-tts/fr/928_486_000075-0001_enhanced.wav) ; environ 5 à 6 fois le temps réel sur processeur.
 
 Entrée  : scenario.json (champ « dit » de chaque phrase, voix dans « voix »)
 Sortie  : build/voix/<id>.wav (48 kHz mono, silences rognés, niveau homogène)
@@ -10,7 +14,8 @@ Contrôle: chaque phrase est transcrite ; si l'écart avec le texte est trop gra
 Usage   : python voix.py            (toutes les phrases)
           python voix.py m4 n1      (seulement certaines)
           python voix.py --strict a1  (n'accepter qu'une transcription exacte, sinon garder le meilleur des 6 essais)
-Licences: Pocket TTS et ses voix sont sous CC-BY 4.0 (Kyutai) : l'attribution figure au générique.
+Licences: modèles Kyutai sous CC-BY 4.0 ; voix CML-TTS sous CC-BY 4.0, voix enregistrées par Kyutai sous CC0 :
+          l'attribution figure au générique.
 """
 import json
 import os
@@ -85,19 +90,41 @@ def ecart(ref, hyp):
     return d[len(h)] / max(1, len(r))
 
 
-def main():
-    from faster_whisper import WhisperModel
+def moteur_pocket(v):
     from pocket_tts import TTSModel
     from pocket_tts.utils.utils import get_predefined_voice
+    modele = TTSModel.load_model(language=v["langue"])
+    etat = modele.get_state_for_audio_prompt(get_predefined_voice(v["langue"], v["nom"]))
+    def dire(texte):
+        return modele.generate_audio(etat, texte, copy_state=True).squeeze().cpu().numpy().astype(np.float32)
+    return modele.sample_rate, dire
+
+
+def moteur_kyutai(v):
+    from moshi.models.loaders import CheckpointInfo
+    from moshi.models.tts import TTSModel, DEFAULT_DSM_TTS_REPO
+    tts = TTSModel.from_checkpoint_info(CheckpointInfo.from_hf_repo(DEFAULT_DSM_TTS_REPO), n_q=32, temp=0.6, device="cpu", dtype=torch.float32)
+    attributs = tts.make_condition_attributes([tts.get_voice_path(v["nom"])], cfg_coef=2.0)
+    def dire(texte):
+        pcms = []
+        def sur_trame(trame):
+            if (trame != -1).all():
+                pcms.append(np.clip(tts.mimi.decode(trame[:, 1:, :]).cpu().float().numpy()[0, 0], -1, 1))
+        with tts.mimi.streaming(1), torch.no_grad():
+            tts.generate([tts.prepare_script([texte], padding_between=1)], [attributs], on_frame=sur_trame)
+        return np.concatenate(pcms).astype(np.float32)
+    return tts.mimi.sample_rate, dire
+
+
+def main():
+    from faster_whisper import WhisperModel
 
     with open(os.path.join(ICI, "scenario.json"), encoding="utf-8") as f:
         sc = json.load(f)
     v = sc["voix"]
     torch.set_num_threads(os.cpu_count() or 4)
-    modele = TTSModel.load_model(language=v["langue"])
-    etat = modele.get_state_for_audio_prompt(get_predefined_voice(v["langue"], v["nom"]))
+    sr, dire = (moteur_kyutai if v["moteur"] == "kyutai-1.6b" else moteur_pocket)(v)
     asr = WhisperModel("large-v3-turbo", device="cpu", compute_type="int8")
-    sr = modele.sample_rate
 
     os.makedirs(SORTIE, exist_ok=True)
     f_durees, f_controle = os.path.join(SORTIE, "durees.json"), os.path.join(SORTIE, "controle.json")
@@ -113,7 +140,7 @@ def main():
             meilleur = None
             for essai in range(ESSAIS):
                 torch.manual_seed(1000 * essai + sum(map(ord, b["id"])))
-                x = modele.generate_audio(etat, b["dit"], copy_state=True).squeeze().cpu().numpy().astype(np.float32)
+                x = dire(b["dit"])
                 x = rogner(x, sr)
                 duree = len(x) / sr
                 g = gcd(sr, 16000)
