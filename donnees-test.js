@@ -441,7 +441,7 @@
       emp: emp, couverts: couverts, items: [], annules: [], menus: [], remise: null, statut: "paid", client: null, enLigne: null
     };
     if (salle === "À emporter" && r() < 0.35) {
-      cmd.enLigne = { ref: "CC-" + reference(r, 6), canal: "Click & Collect", commandeA: Math.max(OUVRE, min - entre(r, 12, 70)) };
+      cmd.enLigne = { ref: "PO-" + reference(r, 6), canal: "Popina Order", commandeA: Math.max(OUVRE, min - entre(r, 12, 70)) };
       cmd.emp = "Commande en ligne";
     }
     remplir(r, c, service, cmd);
