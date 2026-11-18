@@ -32,3 +32,31 @@ _Éviter_ : booking, résa
 
 **Statut de réservation** :
 L'étape où en est une réservation : En attente, Confirmée, Arrivé, En retard, Annulé ou Non venu.
+
+## Pilotage
+
+**Objectif du mois** :
+Un montant de CA à atteindre sur une période, comparé à ce qui était attendu à date (écart d'avance ou de retard) et projeté en fin de période.
+_Éviter_ : cible, budget
+
+**Score de clémence** :
+Une note de 0 à 100 qui résume la météo d'un jour selon son effet sur la fréquentation (température, pluie, ensoleillement, vent).
+_Éviter_ : score météo, indice
+
+**Alerte de stock** :
+Le signal qu'un produit est passé sous son seuil de réapprovisionnement ou en rupture.
+_Éviter_ : notification de stock
+
+**Bon cadeau** :
+Un montant prépayé, identifié par un code, que son bénéficiaire consomme en une ou plusieurs fois avant sa fin de validité.
+_Éviter_ : carte cadeau, avoir
+
+**Export comptable** :
+Le fichier des écritures de ventes d'une période, au format FEC ou CSV, destiné au comptable.
+
+**Pop'IA** :
+L'assistant du back-office qui répond en français, par un chiffre ou un graphique, à une question sur les ventes. Se prononce « pop-i-a ».
+_Éviter_ : chatbot, IA
+
+**Up'Pina** :
+Le nom du produit. Se prononce « eupe-pina ».
