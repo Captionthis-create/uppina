@@ -257,7 +257,7 @@
       graph: { type: type, labels: o.labels, valeurs: o.valeurs, fmt: fmt, liste: o.liste !== false },
       table: { entetes: [o.colonne, o.unite === "€" ? "Montant TTC" : "Quantité", "Part"], lignes: lignes },
       csv: { nom: o.csv + ".csv", entetes: [o.colonne, o.unite === "€" ? "Montant TTC" : "Quantité"], lignes: csvLignes },
-      rapport: o.rapport
+      rapport: o.rapport, focus: o.focus
     };
   }
   function vide(q) {
@@ -292,7 +292,23 @@
       liste.sort(function (a, b) { return q.asc ? a[cle] - b[cle] : b[cle] - a[cle]; });
       var totQ = somme(liste.map(function (p) { return p.productQuantity; })), totV = somme(liste.map(function (p) { return p.productSales; }));
       if (!nomFamille || q.nExplicite) liste = liste.slice(0, q.n);
+      // Une famille (« crêpes », « galettes »...) s'ouvre dans Catégories, déjà dépliée sur la bonne catégorie / sous-catégorie
+      var focus = null;
+      if (estFamille && cible.length) {
+        var cs = {}, ss = {};
+        cible.forEach(function (p) { cs[p.category] = 1; ss[p.subCategory] = 1; });
+        if (Object.keys(cs).length === 1) {
+          focus = { cat: Object.keys(cs)[0], sous: Object.keys(ss).length === 1 ? Object.keys(ss)[0] : "" };
+        }
+      }
+      // Produit précis : la page Produits s'ouvre avec la recherche déjà remplie
+      if (!focus && !estFamille && cible.length && filtre) {
+        var phrase = jetons.filter(function (w) { return cible.some(function (p) { return norm(p.name).indexOf(w) >= 0; }); });
+        var tout = phrase.join(" ");
+        focus = { recherche: cible.some(function (p) { return norm(p.name).indexOf(tout) >= 0; }) ? tout : phrase.sort(function (a, b) { return b.length - a.length; })[0] };
+      }
       var rep = reponseListe(q, {
+        focus: focus,
         intro: (filtre ? "Ventes de « " + filtre + " »" : (q.asc ? "Produits les moins vendus" : "Top " + liste.length + " des produits")) + (q.quantite ? " en quantité" : ""),
         labels: liste.map(function (p) { return p.name; }), valeurs: liste.map(function (p) { return p[cle]; }),
         unite: q.quantite ? "u" : "€", typeDefaut: "hbarres", colonne: "Produit", csv: "produits", rapport: "produits",
@@ -320,7 +336,11 @@
   }
   function hEmployes(q) {
     return D.getReportClerkShifts(parametres(q)).then(function (l) {
+      // Un prénom cité dans la demande : le rapport s'ouvre filtré sur cette personne
+      var cite = null;
+      l.forEach(function (x) { if (!cite && norm(x.name).split(/[\s-]+/).some(function (w) { return w.length >= 3 && new RegExp("\\b" + w + "\\b").test(q.texte); })) cite = x.name; });
       return reponseListe(q, {
+        focus: cite ? { employe: cite } : null,
         intro: "Ventes par employé", labels: l.map(function (x) { return x.name; }), valeurs: l.map(function (x) { return x.totalSalesOwner; }),
         unite: "€", typeDefaut: "hbarres", colonne: "Employé", csv: "employes", rapport: "employes"
       });
@@ -595,7 +615,17 @@
       else if (act === "csv") { rep = reponses[+el.getAttribute("data-i")]; App.telechargerCsv(rep.csv.nom, rep.csv.entetes, rep.csv.lignes); }
       else if (act === "ouvrir") {
         rep = reponses[+el.getAttribute("data-i")];
-        allerA(ROUTES_RAPPORT[rep.rapport], rep.q || analyser(""));
+        if (rep.focus && rep.focus.cat) {
+          // Pré-sélectionne le filtre de l'écran Catégories (état conservé par chemin)
+          App.etat["/reports/sales-report/categories"] = { cat: rep.focus.cat, sous: rep.focus.sous || "" };
+          allerA(ROUTES_RAPPORT.categories, rep.q || analyser(""));
+        } else if (rep.focus && rep.focus.recherche) {
+          App.etat["/reports/sales-report/products"] = { recherche: rep.focus.recherche };
+          allerA(ROUTES_RAPPORT.produits, rep.q || analyser(""));
+        } else if (rep.focus && rep.focus.employe) {
+          App.etat["/reports/sales-report/employees"] = { employe: rep.focus.employe };
+          allerA(ROUTES_RAPPORT.employes, rep.q || analyser(""));
+        } else allerA(ROUTES_RAPPORT[rep.rapport], rep.q || analyser(""));
       }
     });
     accueil();
