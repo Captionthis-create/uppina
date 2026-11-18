@@ -1,5 +1,5 @@
 /*
- * ecrans-meteo.js : mode météo (facultatif, activé dans le menu du compte).
+ * ecrans-meteo.js : météo (activée par défaut ; ville et On/Off dans le menu du compte).
  * Composants (App.meteo) utilisés par le Tableau de bord et les rapports de ventes, et écran « Prévisions météo ».
  * Les données viennent de DonneesTest (getWeatherDays, getWeatherForecast, getWeatherImpact).
  */
@@ -56,12 +56,10 @@
   function kpiMeteo(libelle, valeur, sous) {
     return '<div class="kpi"><div class="kpi-l">' + libelle + '</div><div class="kpi-v">' + valeur + '</div><div class="meteo-kpi-sous">' + (sous || "&nbsp;") + "</div></div>";
   }
-  function bandeauFactice(r) {
-    return r.factice ? '<div class="bandeau-factice">Données factices : en mode Test, la météo des jours passés est inventée. Aujourd\'hui et les jours à venir sont réels.</div>' : "";
-  }
   function messageAbsent() {
-    return A.vide("Météo non récupérée. Lancez Lancer Pop'IA.bat (ou outils\\recuperer-meteo.ps1).");
+    return A.vide("Météo momentanément indisponible. Réessayez dans quelques instants.");
   }
+  function ville() { return window.MeteoDemo ? MeteoDemo.ville().nom : "Rennes"; }
 
   // Carte du Tableau de bord : score et chiffres de la période, comparés à l'autre période, avec courbe du score par jour.
   // jours / joursComp : tableaux de getWeatherDays ; nomComp : libellé de la période comparée (ou null)
@@ -81,7 +79,7 @@
     var graphe = A.graph.courbe({ labels: labels, series: series, hauteur: 220 });
     var legende = '<div class="legende"><span><i class="trait" style="background:#d99a1e"></i>Score météo · ' + E(A.libellePeriode(periode)) + "</span>" +
       (c ? '<span><i class="trait" style="background:#999"></i>' + E(nomComp) + "</span>" : "") + "</div>";
-    return A.carte("Météo", bandeauFactice(r) + kpis + graphe + legende);
+    return A.carte("Météo · " + E(ville()) + ' <span class="badge-nouveau">Nouveau</span>', kpis + graphe + legende);
   };
 
   // Grille de jours à venir (bandeau du Tableau de bord, écran Prévisions). impact : résultat de getWeatherImpact (facultatif)
@@ -89,8 +87,8 @@
     return '<div class="meteo-grille">' + jours.map(function (j) {
       var ca = "";
       if (impact && j.score != null) {
-        var t = impact.tranches[j.score < 40 ? 0 : (j.score < 70 ? 1 : 2)];
-        if (t && t.moyenne != null && t.jours >= 3) ca = '<div class="mj-ca" title="Moyenne des ventes TTC observées les jours de même clémence (' + t.jours + ' jours)">≈ ' + A.euro(t.moyenne) + "</div>";
+        var est = D.estimationMeteo(impact, j.date, j.score);
+        if (est) ca = '<div class="mj-ca" title="CA attendu : moyenne des mêmes jours de la semaine (8 dernières semaines), corrigée par la clémence de la météo">≈ ' + A.euro(est).replace(/,00\s/, " ") + "</div>";
       }
       if (j.tmax == null) return '<div class="meteo-jour"><div class="mj-date">' + E(dateCourte(j.date)) + '</div><div class="mj-ico">·</div><div class="mj-det">Non disponible</div></div>';
       return '<div class="meteo-jour"><div class="mj-date">' + E(dateCourte(j.date)) + '</div><div class="mj-ico" title="' + E(M.libelle(j.code)) + '">' + M.icone(j.code) + "</div>" +
@@ -104,7 +102,7 @@
   M.carteBandeau = function () {
     return Promise.all([D.getWeatherForecast(7), D.getWeatherImpact()]).then(function (res) {
       if (!M.resume(res[0].jours).connu) return "";
-      return A.carte("Météo des 7 prochains jours", M.grille(res[0].jours, res[1]), { droite: '<a class="bouton" href="#/reports/forecast">Prévisions</a>' });
+      return A.carte("Météo des 7 prochains jours · " + E(ville()), M.grille(res[0].jours, res[1]), { droite: '<a class="bouton" href="#/reports/forecast">Prévisions</a>' });
     });
   };
 
@@ -114,9 +112,9 @@
     D.getWeatherDays(p).then(function (res) {
       var r = M.resume(res.jours);
       if (!r.connu) { el.innerHTML = ""; return; }
-      el.innerHTML = A.carte("", '<div class="meteo-ligne"><span>☀️ <b>Météo de la période</b></span><span>Score ' + M.pastille(r.score == null ? null : Math.round(r.score)) +
+      el.innerHTML = A.carte("", '<div class="meteo-ligne"><span>☀️ <b>Météo de la période · ' + E(ville()) + "</b></span><span>Score " + M.pastille(r.score == null ? null : Math.round(r.score)) +
         "</span><span>Température max <b>" + un(r.tmax) + " °C</b></span><span>Pluie <b>" + (r.pluie == null ? "–" : un(r.pluie) + " mm") + "</b> (" + r.joursPluie + " j)</span><span>Soleil <b>" + un(r.soleil) + " h/j</b></span>" +
-        (r.factice ? '<span class="doux">Données factices (Test)</span>' : "") + "</div>", { classe: "meteo-bandeau" });
+        "</div>", { classe: "meteo-bandeau" });
     });
   };
 
@@ -125,7 +123,8 @@
     section: "rapports", fil: ["Prévisions météo"],
     rendre: function (ctx, zone) {
       if (!A.meteoActif()) {
-        zone.innerHTML = A.carte("", A.vide("Mode météo désactivé. Activez-le dans le menu du compte (en haut à droite › Météo › On)."));
+        A.act.activerMeteo = function () { MeteoDemo.activer(true); A.construireMenuCompte(); A.info("Météo activée."); ctx.rafraichir(); };
+        zone.innerHTML = A.carte("", A.vide("La météo est désactivée.") + '<p class="centre"><button class="bouton sombre" data-act="activerMeteo">Activer la météo</button></p>');
         return;
       }
       Promise.all([D.getWeatherForecast(16), D.getWeatherImpact()]).then(function (res) {
@@ -143,9 +142,11 @@
           ["Jour le moins clément", pire ? E(dateCourte(pire.date)) + " " + M.pastille(pire.score) : "–"],
           ["Pluie prévue (7 jours)", r.pluie == null ? "–" : un(r.pluie) + " mm"]
         ]);
-        var note = '<p class="doux">Score de clémence 0-100 : température (35 %), pluie (30 %), ensoleillement (25 %), vent (10 %). Le montant « ≈ » est la moyenne des ventes TTC des jours passés de même clémence (indicatif).' +
-          (res[0].recupereLe ? " Météo récupérée le " + E(res[0].recupereLe) + "." : "") + "</p>";
-        zone.innerHTML = kpis + A.carte("Les 16 prochains jours", M.grille(jours, impact)) + note;
+        var heure = res[0].recupereLe ? new Date(res[0].recupereLe).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
+        var note = '<p class="doux">Score de clémence 0-100 : température (35 %), pluie (30 %), ensoleillement (25 %), vent (10 %). Le montant « ≈ » est le CA attendu : moyenne des mêmes jours de la semaine, corrigée par la météo (indicatif).' +
+          " Prévisions Open-Meteo pour " + E(res[0].ville) + (heure ? ", mises à jour à " + heure : "") + '. <a class="lien-souligne" data-act="changerVille">Changer de ville</a></p>';
+        A.act.changerVille = function () { document.getElementById("menu-compte").classList.add("ouvert"); if (A.actGlobal.ville) A.actGlobal.ville(); };
+        zone.innerHTML = kpis + A.carte("Les 16 prochains jours · " + E(res[0].ville) + ' <span class="badge-nouveau">Nouveau</span>', M.grille(jours, impact)) + note;
       });
     }
   });

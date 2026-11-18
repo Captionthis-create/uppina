@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pop'IA - Back-office</title>
+  <title>Up'Pina - Back-office</title>
+  <meta name="description" content="Up'Pina : démonstration du back-office (données simulées).">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,10 +14,10 @@
         <path d="M14 2.5C7.9 2.5 3 7 3 12.7c0 3.2 1.6 6 4 7.8V25l4.6-3.1c.8.2 1.5.3 2.4.3 6.1 0 11-4.500 11-10.200S20.100 2.500 14 2.500z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"></path>
         <path d="M14 6.800l1.700 4.500 4.500 1.700-4.500 1.700L14 19.200l-1.700-4.500L7.800 13l4.500-1.700z" fill="currentColor"></path>
       </svg>
-      <span>Pop'IA</span>
+      <span>Up'Pina</span>
     </a>
     <nav class="entete-liens">
-      <span class="badge-mode" id="badge-mode" hidden>DONNÉES RÉELLES</span>
+      <span class="badge-demo" id="badge-demo" title="Démonstration : toutes les données sont simulées">Démo</span>
       <div class="menu-conteneur" id="cloche-alertes" hidden>
         <button class="bouton-cloche" data-ouvre="alertes" title="Alertes de réapprovisionnement" aria-label="Alertes de réapprovisionnement"></button>
         <div class="menu-flottant droite menu-alertes" id="menu-alertes"></div>
@@ -33,18 +34,21 @@
 
   <main id="page"></main>
 
-  <!-- Scripts classiques (pas de import/fetch : compatible double-clic) -->
-  <!-- Facultatif : vraies données, produit par outils\Mettre-a-jour-les-donnees.bat (absent = mode test seulement) -->
-  <script src="donnees-reelles.js" charset="utf-8"></script>
-  <!-- Facultatif : météo, produite par outils\recuperer-meteo.ps1 (absent = mode météo vide) -->
-  <script src="meteo.js" charset="utf-8"></script>
+  <!-- Scripts classiques (pas de modules : la page marche aussi en double-clic) -->
+  <script src="stockage.js"></script>
+  <script src="meteo-rennes.js"></script>
+  <script src="meteo-demo.js"></script>
   <script src="donnees-test.js"></script>
+  <script src="donnees-gestion.js"></script>
+  <script src="contenus.js"></script>
   <script src="noyau.js"></script>
+  <script src="direct.js"></script>
   <script src="ecrans-rapports.js"></script>
   <script src="ecrans-meteo.js"></script>
   <script src="ecrans-compta.js"></script>
   <script src="ecrans-pdv.js"></script>
   <script src="ecrans-autres.js"></script>
+  <script src="ecrans-comptes.js"></script>
   <script src="ecrans-chatbot.js"></script>
   <script src="app.js"></script>
 </body>

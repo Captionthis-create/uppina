@@ -1,14 +1,14 @@
 /*
  * ecrans-compta.js : export comptable construit à partir des clôtures de caisse (Z).
  * Écran /reports/sales-report/accounting-export. Le paramétrage (comptes, journal, format) est gardé dans le navigateur
- * (localStorage, clé « compta-copie ») ; les données viennent de DonneesTest (getNewHistoryZTill, getReportById).
+ * (Stockage, clé « compta ») ; les données viennent de DonneesTest (getNewHistoryZTill, getReportById).
  * Principe : une écriture équilibrée par caisse / jour / mois = débit des modes de paiement, crédit des ventes HT
  * et de la TVA collectée par taux ; l'écart éventuel (arrondis, écart de caisse) va sur un compte dédié.
  */
 (function () {
   "use strict";
   var A = App, E = A.echapper, D = DonneesTest;
-  var CLE = "compta-copie";
+  var CLE = "compta", S = window.Stockage;
 
   // ---------- Paramétrage par défaut (plan comptable général, restauration) ----------
   var VENTES_DEFAUT = {
@@ -28,6 +28,7 @@
   // Compte proposé pour un mode de paiement, d'après son nom
   function devinerPaiement(nom) {
     var n = nom.toLowerCase();
+    if (/en ligne|click|online/.test(n)) return { c: "511600", l: "Paiements en ligne à encaisser" };
     if (/esp[eè]ces?|cash/.test(n)) return { c: "530000", l: "Caisse espèces" };
     if (/ch[eè]que.*vacances|ancv/.test(n)) return { c: "511400", l: "Chèques vacances à encaisser" };
     if (/ch[eè]que/.test(n)) return { c: "511200", l: "Chèques à encaisser" };
@@ -40,8 +41,8 @@
   }
 
   function fus(base, sur) { var o = {}, k; for (k in base) o[k] = base[k]; for (k in (sur || {})) if (sur[k] !== undefined) o[k] = sur[k]; return o; }
-  function lireBrut() { try { var c = JSON.parse(localStorage.getItem(CLE) || "null"); return c && typeof c === "object" ? c : {}; } catch (e) { return {}; } }
-  function sauver(c) { try { localStorage.setItem(CLE, JSON.stringify(c)); return true; } catch (e) { A.info("Stockage du navigateur indisponible."); return false; } }
+  function lireBrut() { var c = S.lire(CLE, null); return c && typeof c === "object" ? c : {}; }
+  function sauver(c) { if (S.ecrire(CLE, c)) return true; A.info("Stockage du navigateur indisponible."); return false; }
   function lireConfig() {
     var b = lireBrut(), c = fus(DEFAUT, b);
     c.ecartPlus = fus(DEFAUT.ecartPlus, b.ecartPlus); c.ecartMoins = fus(DEFAUT.ecartMoins, b.ecartMoins); c.attente = fus(DEFAUT.attente, b.attente);
@@ -178,7 +179,7 @@
 
         var segFormat = A.segment("comptaFormat", FORMATS, cfg.format, function (v) { var c = lireBrut(); c.format = v; sauver(c); ctx.rafraichir(); });
         var segRegroup = A.segment("comptaRegroup", REGROUPEMENTS, cfg.regroupement, function (v) { var c = lireBrut(); c.regroupement = v; sauver(c); ctx.rafraichir(); });
-        A.act.comptaReset = function () { if (window.confirm("Rétablir le paramétrage comptable par défaut ?")) { try { localStorage.removeItem(CLE); } catch (e) { /* ignoré */ } ctx.rafraichir(); } };
+        A.act.comptaReset = function () { if (window.confirm("Rétablir le paramétrage comptable par défaut ?")) { S.retirer(CLE); ctx.rafraichir(); } };
 
         var general = '<div class="cpt-grille">' +
           '<div><div class="cpt-lib">Format du fichier</div>' + segFormat + '<p class="doux cpt-aide">' + (cfg.format === "fec" ? "Fichier des écritures comptables (18 colonnes, séparateur tabulation) : celui que demande l'administration fiscale et que tous les logiciels comptables importent." : "CSV « ; » avec Date, Journal, Pièce, Compte, Libellés, Débit, Crédit : à importer dans Excel ou à faire correspondre aux colonnes de l'import du logiciel du comptable.") + "</p></div>" +
