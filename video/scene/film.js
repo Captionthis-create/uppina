@@ -668,6 +668,7 @@
         // Chaque séquence a sa couche, qui apparaît en fondu sous le carton d'heure
         var oSeq = sq[0] === "matin" ? 1 : p(t, sc.debut + 0.3, sc.debut + 0.85);
         var couche = M.bloc("seq-" + sq[0], "", 0, 0, 1440, 810, oSeq, 1 + i, contenu);
+        if (t >= sc.debut + 0.55) ONGLET_COURANT = "Accueil"; // la séquence au premier plan impose son onglet
         sq[1](t, couche);
       });
       carton(t, contenu);
