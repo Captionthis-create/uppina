@@ -1,7 +1,7 @@
 /*
  * noyau.js : tout ce qui est commun aux écrans (routeur, mise en page, menus,
  * composants, graphiques). Aucune donnée ici : les écrans (ecrans-*.js)
- * demandent tout à DonneesTest (donnees-test.js).
+ * demandent tout à DonneesTest (donnees-test.js, donnees-gestion.js).
  *
  * Un écran se déclare avec App.ecran("/route", { section, fil, actions, filtres, rendre }).
  */
@@ -186,8 +186,8 @@
     d.setDate(d.getDate() - 364); f.setDate(f.getDate() - 364);
     return { dateStart: jourIso(d), dateEnd: jourIso(f) };
   };
-  // Mode météo : facultatif, désactivé par défaut, mémorisé dans le navigateur
-  App.meteoActif = function () { try { return localStorage.getItem("meteo-copie") === "1"; } catch (e) { return false; } };
+  // Météo : activée par défaut (menu du compte › Météo), ville choisie dans le même menu
+  App.meteoActif = function () { return window.MeteoDemo ? MeteoDemo.actif() : false; };
   App.peutAvancer = function (p) { return App.decalerPeriode(p, 1).dateStart <= App.aujourdhui(); };
   App.choixPeriode = function () {
     var j0 = App.periodeJour(0), j1 = App.periodeJour(-1), m = App.periodeMois(), m1 = App.decalerPeriode(m, -1);
@@ -252,7 +252,7 @@
     var puces = ORDRE_JOURS.map(function (d) {
       return '<button type="button" class="puce-jour' + (jours.indexOf(d) >= 0 ? " actif" : "") + '" data-tr-jour="' + d + '" title="' + E(App.majuscule(JOURS_PLURIEL[d])) + '">' + E(JOURS_ABR[d].charAt(0).toUpperCase()) + "</button>";
     }).join("");
-    return '<div class="menu-conteneur"><button class="bouton' + (tr ? " bouton-tranche" : "") + '" data-ouvre="tranche">' + (tr ? E(App.libelleTranche(tr)) : "Jours &amp; heures") + App.icones.basPetit + "</button>" +
+    return '<div class="menu-conteneur"><button class="bouton' + (tr ? " bouton-tranche" : "") + '" data-ouvre="tranche">' + (tr ? E(App.libelleTranche(tr)) : "Jours &amp; heures") + (tr ? "" : '<span class="badge-nouveau">Nouveau</span>') + App.icones.basPetit + "</button>" +
       '<div class="menu-flottant menu-tranche" id="menu-tranche">' +
       '<div class="tr-titre">Jours de la semaine</div><div class="tr-jours">' + puces + "</div>" +
       '<div class="tr-titre">Plage horaire</div><div class="tr-heures"><label>De<input type="time" id="tr-de" value="' + (tr && tr.h1 !== null ? enHeure(tr.h1) : "") + '"></label>' +
@@ -319,7 +319,7 @@
     setTimeout(function () { t.classList.add("visible"); }, 10);
     setTimeout(function () { t.classList.remove("visible"); setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 300); }, 2600);
   };
-  App.nonDispo = function () { App.info("Non disponible dans la copie (lecture seule)."); };
+  App.nonDispo = function () { App.info("Fonction non incluse dans la démo."); };
 
   document.addEventListener("click", function (e) {
     var cible = e.target;
@@ -413,7 +413,7 @@
   // ---- Table de données : recherche, tri, colonnes, pagination (tout côté navigateur) ----
   // cfg = { colonnes:[{t,k,a,f(row),tri(row),cache}], lignes, rech:{ph,texte(row)}, pageSize, filtres:html, vide, total:[html..], onLigne(row) }
   App.monterTable = function (zone, cfg) {
-    var st = { q: "", page: 0, taille: cfg.pageSize || 10, tri: null, cachees: {} };
+    var st = { q: "", page: 0, taille: cfg.pageSize || 10, tri: null, cachees: {}, filtres: [] };
     (cfg.colonnes || []).forEach(function (c) { if (c.cache) st.cachees[c.t] = true; });
     var id = "td" + Math.floor(Math.random() * 1e6);
 
@@ -425,6 +425,7 @@
       (cfg.sansColonnes ? "" : '<div class="menu-conteneur"><button class="bouton" data-ouvre="' + id + '">' + App.icones.filtres + ' Colonnes</button>' +
         '<div class="menu-flottant droite" id="menu-' + id + '">' +
         cfg.colonnes.map(function (c, i) { return '<button class="choix" data-col="' + i + '">' + E(c.t) + "</button>"; }).join("") + "</div></div>") + "</div>" +
+      (cfg.sansFiltrer ? "" : '<div class="td-filtres" data-filtres></div>') +
       (cfg.selection ? '<div class="td-selbarre masque" data-selbarre></div>' : "") +
       '<div class="td-corps"></div>';
     var corps = zone.querySelector(".td-corps");
@@ -442,9 +443,42 @@
       }
     }
 
+    // Filtres avancés : colonne + condition + valeur (« Catégorie contient Crêpes », « Prix ≥ 10 »)
+    function brut(html) { var d = document.createElement("div"); d.innerHTML = html; return d.textContent || ""; }
+    function valeurCol(c, r) { if (c.tri) return c.tri(r); if (c.k) return r[c.k]; return c.f ? brut(c.f(r)) : ""; }
+    function nombre(v) { if (typeof v === "number") return v; var n = parseFloat(String(v).replace(/\s/g, "").replace(/[€%]/g, "").replace(",", ".")); return isFinite(n) ? n : null; }
+    function passe(r, f) {
+      var c = cfg.colonnes[f.i], v = valeurCol(c, r), nv = nombre(v), nf = nombre(f.v);
+      if (f.op === "min" || f.op === "max") return nv !== null && nf !== null && (f.op === "min" ? nv >= nf : nv <= nf);
+      var a = String(v == null ? "" : v).toLowerCase(), b = String(f.v).toLowerCase();
+      if (f.op === "egal") return nv !== null && nf !== null ? nv === nf : a === b;
+      return a.indexOf(b) >= 0;
+    }
+    var LIB_OP = { contient: "contient", egal: "=", min: "≥", max: "≤" };
+    function dessinerFiltres() {
+      var z = zone.querySelector("[data-filtres]");
+      if (!z) return;
+      var cols = cfg.colonnes.map(function (c, i) { return { c: c, i: i }; }).filter(function (x) { return x.c.t; });
+      z.innerHTML = (st.panneau ? '<div class="td-filtre-panneau"><select data-f-col aria-label="Colonne">' + cols.map(function (x) { return '<option value="' + x.i + '">' + E(x.c.t) + "</option>"; }).join("") + "</select>" +
+        '<select data-f-op aria-label="Condition"><option value="contient">contient</option><option value="egal">est égal à</option><option value="min">supérieur ou égal à</option><option value="max">inférieur ou égal à</option></select>' +
+        '<input data-f-val placeholder="Valeur" aria-label="Valeur"><button class="bouton sombre" data-f-ajout>Ajouter le filtre</button></div>' : "") +
+        (st.filtres.length ? '<div class="td-puces">' + st.filtres.map(function (f, k) {
+          return '<span class="puce-filtre">' + E(cfg.colonnes[f.i].t) + " " + LIB_OP[f.op] + " <b>" + E(f.v) + '</b><button data-f-retire="' + k + '" aria-label="Retirer le filtre">✕</button></span>';
+        }).join("") + '<button class="lien-bouton" data-f-vider>Tout effacer</button></div>' : "");
+      var val = z.querySelector("[data-f-val]");
+      if (val) { val.focus(); val.onkeydown = function (e) { if (e.key === "Enter") ajouterFiltre(); }; }
+    }
+    function ajouterFiltre() {
+      var z = zone.querySelector("[data-filtres]"), v = z.querySelector("[data-f-val]").value.trim();
+      if (!v) { App.info("Saisissez une valeur pour le filtre."); return; }
+      st.filtres.push({ i: +z.querySelector("[data-f-col]").value, op: z.querySelector("[data-f-op]").value, v: v });
+      st.panneau = false; st.page = 0; dessinerFiltres(); dessiner();
+    }
     function filtrees() {
       var q = st.q.trim().toLowerCase();
-      var l = cfg.lignes.filter(function (r) { return !q || (cfg.rech && cfg.rech.texte(r).toLowerCase().indexOf(q) >= 0); });
+      var l = cfg.lignes.filter(function (r) { return st.filtres.every(function (f) { return passe(r, f); }); });
+      st.cachesParFiltres = cfg.lignes.length - l.length;
+      l = l.filter(function (r) { return !q || (cfg.rech && cfg.rech.texte(r).toLowerCase().indexOf(q) >= 0); });
       if (st.tri) {
         var c = cfg.colonnes[st.tri.i], val = c.tri || function (r) { return r[c.k]; };
         l = l.slice().sort(function (a, b) {
@@ -483,7 +517,7 @@
       h += "</tbody></table>";
       if (cfg.sansPied) { corps.innerHTML = h; corps._vue = l; majSelection(l); return; }
       h += '<div class="td-pied"><span class="doux">De ' + (l.length ? debut + 1 : 0) + "-" + Math.min(l.length, debut + st.taille) + " sur " + App.entier(l.length) +
-        " éléments - 0 lignes cachées par les filtres</span><span class=\"td-espace\"></span>" +
+        " éléments - " + App.entier(st.cachesParFiltres || 0) + " ligne" + ((st.cachesParFiltres || 0) > 1 ? "s" : "") + " cachée" + ((st.cachesParFiltres || 0) > 1 ? "s" : "") + " par les filtres</span><span class=\"td-espace\"></span>" +
         '<span class="doux">Nombre de lignes par page</span><select data-taille>' +
         [10, 20, 50].map(function (n) { return '<option value="' + n + '"' + (n === st.taille ? " selected" : "") + ">" + n + "</option>"; }).join("") +
         '</select><span class="doux">Page ' + (st.page + 1) + " sur " + pages + "</span>" +
@@ -496,6 +530,13 @@
     zone.addEventListener("input", function (e) { if (e.target.hasAttribute("data-r")) { st.q = e.target.value; st.page = 0; dessiner(); } });
     zone.addEventListener("change", function (e) { if (e.target.hasAttribute("data-taille")) { st.taille = +e.target.value; st.page = 0; dessiner(); } });
     zone.addEventListener("click", function (e) {
+      var f = e.target.closest("[data-f-ajout],[data-f-retire],[data-f-vider]");
+      if (f) {
+        if (f.hasAttribute("data-f-ajout")) ajouterFiltre();
+        else if (f.hasAttribute("data-f-vider")) { st.filtres = []; st.page = 0; dessinerFiltres(); dessiner(); }
+        else { st.filtres.splice(+f.getAttribute("data-f-retire"), 1); st.page = 0; dessinerFiltres(); dessiner(); }
+        return;
+      }
       var t = e.target.closest("[data-tri],[data-p],[data-col],[data-filtrer],[data-sel],[data-selall],[data-selvider],[data-ligne],[data-dep]");
       if (!t) return;
       if (t.hasAttribute("data-selall")) {
@@ -513,7 +554,7 @@
       else if (t.hasAttribute("data-tri")) { var i = +t.getAttribute("data-tri"); st.tri = st.tri && st.tri.i === i ? { i: i, sens: -st.tri.sens } : { i: i, sens: 1 }; dessiner(); }
       else if (t.hasAttribute("data-p") && !t.disabled) { st.page = +t.getAttribute("data-p"); dessiner(); }
       else if (t.hasAttribute("data-col")) { var c = cfg.colonnes[+t.getAttribute("data-col")]; st.cachees[c.t] = !st.cachees[c.t]; dessiner(); }
-      else if (t.hasAttribute("data-filtrer")) App.info("Filtres avancés non disponibles dans la copie.");
+      else if (t.hasAttribute("data-filtrer")) { st.panneau = !st.panneau; dessinerFiltres(); }
       else if (t.hasAttribute("data-ligne") && cfg.onLigne) cfg.onLigne(corps._vue[+t.getAttribute("data-ligne")]);
     });
     dessiner();
@@ -633,28 +674,28 @@
   var ventes = [
     ["Produits", "products"], ["Options", "modifiers"], ["Employés", "employees"], ["Annulations", "cancelation"], ["Pertes", "losses"],
     ["Remises", "discounts"], ["Taxes", "taxes"], ["Paiements", "payments"], ["Catégories", "categories"],
-    ["Taux de Répartition", "sales-distribution"], ["Menus", "menus"], ["Historique des caisses", "z-report"], ["Export comptable", "accounting-export"], ["Fiscal", "fiscal"]
-  ].map(function (x) { return { label: x[0], route: "/reports/sales-report/" + x[1] }; });
+    ["Taux de Répartition", "sales-distribution"], ["Menus", "menus"], ["Historique des caisses", "z-report"], ["Export comptable", "accounting-export", true], ["Fiscal", "fiscal"]
+  ].map(function (x) { return { label: x[0], route: "/reports/sales-report/" + x[1], nouveau: !!x[2] }; });
   var reglagesPdv = [
     ["Imprimantes", "printers"], ["Postes de préparation", "prepa-stations"], ["Types de prix", "price-types"], ["Taxes", "taxes"],
     ["Remises", "discounts"], ["Mouvements de caisse", "cash-movements"], ["Ticket de caisse", "receipt"], ["Modes de paiement", "payments"],
-    ["Créneaux de service", "service-slots"], ["Réglages divers", "misc-settings"], ["Appareils et Contrats", "devices-contracts"]
-  ].map(function (x) { return { label: x[0], route: "/point-of-sale/settings/" + x[1] }; });
+    ["Créneaux de service", "service-slots", true], ["Réglages divers", "misc-settings"], ["Appareils et Contrats", "devices-contracts"]
+  ].map(function (x) { return { label: x[0], route: "/point-of-sale/settings/" + x[1], nouveau: !!x[2] }; });
 
   var SECTIONS = {
     rapports: {
       titre: "Rapports", items: [
         { label: "Tableau de bord", route: "/reports/dashboard", icone: ICONES.courbe },
         { label: "Caisses en cours", route: "/reports/tills-in-progress", icone: ICONES.direct },
-        { label: "Objectifs", route: "/reports/objectifs", icone: ICONES.courbe },
-        { label: "Stocks", route: "/reports/stocks", icone: ICONES.stocks },
-        { label: "Prévisions météo", route: "/reports/forecast", icone: ICONES.soleil, meteo: true },
+        { label: "Objectifs", route: "/reports/objectifs", icone: ICONES.cible, nouveau: true },
+        { label: "Stocks", route: "/reports/stocks", icone: ICONES.stocks, nouveau: true },
+        { label: "Prévisions météo", route: "/reports/forecast", icone: ICONES.soleil, meteo: true, nouveau: true },
         { groupe: "ventes", label: "Rapports des ventes", icone: ICONES.dossier, items: ventes }
       ]
     },
     pdv: {
       titre: "Point De Vente", items: [
-        { label: "Produits", route: "/point-of-sale/products-list", icone: ICONES.liste },
+        { label: "Produits", route: "/point-of-sale/products-list", icone: ICONES.liste, nouveau: true },
         { label: "Mise en page", route: "/point-of-sale/catalog", icone: ICONES.grille },
         { label: "Options", route: "/point-of-sale/modifiers", icone: ICONES.options },
         { label: "Menus", route: "/point-of-sale/meals", icone: ICONES.couverts },
@@ -663,7 +704,7 @@
         { groupe: "reglages-pdv", label: "Réglages", icone: ICONES.engrenage, items: reglagesPdv }
       ]
     },
-    clients: { titre: "Fiches Clients", items: [{ label: "Liste des clients", route: "/customers", icone: ICONES.clients }, { label: "Bons cadeaux", route: "/customers/vouchers", icone: ICONES.cadeau }] },
+    clients: { titre: "Fiches Clients", items: [{ label: "Liste des clients", route: "/customers", icone: ICONES.clients }, { label: "Bons cadeaux", route: "/customers/vouchers", icone: ICONES.cadeau, nouveau: true }] },
     reglages: {
       titre: "Mon Compte", items: [
         { label: "Profil", route: "/settings/profile", icone: ICONES.utilisateur },
@@ -690,7 +731,7 @@
     var q = section === "rapports" && params.dateStart ? "?dateStart=" + params.dateStart + "&dateEnd=" + params.dateEnd + requeteTranche(params.tr) : "";
     if (it.ancre) q = "?cat=" + encodeURIComponent(it.ancre);
     var ok = it.ancre ? false : actif(it.route, chemin);
-    return '<a href="#' + it.route + q + '" class="' + (it.icone ? "niveau1" : "") + (ok ? " actif" : "") + '">' + (it.icone || "") + E(it.label) + "</a>";
+    return '<a href="#' + it.route + q + '" class="' + (it.icone ? "niveau1" : "") + (ok ? " actif" : "") + '">' + (it.icone || "") + E(it.label) + (it.nouveau ? '<span class="badge-nouveau">Nouveau</span>' : "") + "</a>";
   }
   function barreLaterale(section, chemin, params) {
     var s = SECTIONS[section];
@@ -710,7 +751,7 @@
   // Mise en page d'un écran
   // ======================================================================
   var ONGLETS = [
-    { id: "home", label: "Accueil", route: "/", prefixe: "" },
+    { id: "home", label: "Accueil", route: "/", prefixe: "", nouveau: true },
     { id: "orders", label: "Commandes", route: "/orders", prefixe: "/orders" },
     { id: "reports", label: "Rapports", route: "/reports/dashboard", prefixe: "/reports" },
     { id: "pos", label: "Point de vente", route: "/point-of-sale/products-list", prefixe: "/point-of-sale" },
@@ -720,7 +761,7 @@
   function dessinerEntete(chemin) {
     document.getElementById("onglets").innerHTML = ONGLETS.map(function (o) {
       var ok = o.prefixe ? chemin.indexOf(o.prefixe) === 0 : chemin === "/";
-      return '<a href="#' + o.route + '"' + (ok ? ' class="actif"' : "") + ">" + o.label + "</a>";
+      return '<a href="#' + o.route + '"' + (ok ? ' class="actif"' : "") + ">" + o.label + (o.nouveau ? '<span class="pastille-nouveau" title="Nouveau"></span>' : "") + "</a>";
     }).join("");
     document.getElementById("lien-news").className = chemin === "/whats-new" ? "actif" : "";
     document.getElementById("lien-aide").className = chemin === "/help" ? "actif" : "";
@@ -746,22 +787,24 @@
   App.actGlobal.sites = function () { /* un seul site de test : même résultat */ };
   App.actGlobal.groupe = function (g) { groupesOuverts[g] = !groupesOuverts[g]; App.garderMenuLat = true; App.afficher(); };
 
-  // Écrans sans source dans l'API officielle : masqués en mode « Réelles » (voir API-officielle.md)
-  var HORS_API = ["/reports/stocks", "/reports/sales-report/fiscal", "/point-of-sale/meals", "/point-of-sale/settings/printers", "/point-of-sale/settings/prepa-stations",
-    "/point-of-sale/settings/price-types", "/point-of-sale/settings/discounts", "/point-of-sale/settings/cash-movements", "/point-of-sale/settings/misc-settings",
-    "/reservations", "/customers", "/customers/vouchers", "/settings/profile", "/settings/auth-methods", "/settings/notifications", "/settings/users", "/settings/roles",
-    "/integrations", "/whats-new", "/help"];
-  function horsApi(chemin) { return HORS_API.indexOf(chemin) >= 0 || chemin.indexOf("/customers/view/") === 0; }
-
-  App.afficher = function () {
+  function A_introuvable(chemin) {
+    return '<div class="carte"><div class="etat-vide"><div class="etat-vide-rond">' + ICONES.document + '</div><h3>Cette page n\'existe pas</h3><p class="doux">' + E(chemin) +
+      '</p><a class="bouton sombre" href="#/">Revenir à l\'accueil</a></div></div>';
+  }
+  App.afficher = function (opts) {
+    opts = opts || {};
     var url = lireUrl(), chemin = url.chemin;
-    var m = trouver(chemin), cfg = m ? m.cfg : { section: null, fil: ["Bientôt disponible"], rendre: function (ctx, zone) { zone.innerHTML = '<div class="bientot">Bientôt disponible<br><small>' + E(chemin) + "</small></div>"; } };
-    App.fermerMenus(); App.fermerTiroir();
+    if (window.Stockage.lire("deconnecte", false) && chemin !== "/connexion") { location.hash = "/connexion"; return; }
+    var m = trouver(chemin), cfg = m ? m.cfg : { section: null, fil: ["Page introuvable"], rendre: function (ctx, zone) { zone.innerHTML = A_introuvable(chemin); } };
+    document.body.classList.toggle("page-pleine", !!cfg.plein);
+    App.fermerMenus(); App.fermerTiroir(); App.fermerFenetre();
     App.act = {};
     dessinerEntete(chemin);
 
     var ctx = { chemin: chemin, params: url.params, ids: m ? m.ids : {}, etat: (App.etat[chemin] = App.etat[chemin] || {}) };
-    var defaut = cfg.periodeJour ? App.periodeJour(0) : App.periodeMois();
+    var avantOuverture = DonneesTest.maintenantMin() < DonneesTest.HEURE_OUVERTURE;
+    var defaut = cfg.periodeJour ? App.periodeJour(avantOuverture ? -1 : 0) : App.periodeMois();
+    if (!cfg.periodeJour && avantOuverture && new Date().getDate() === 1) defaut = App.decalerPeriode(defaut, -1);
     ctx.periode = url.params.dateStart && url.params.dateEnd ? { dateStart: url.params.dateStart, dateEnd: url.params.dateEnd } : defaut;
     ctx.tranche = App.lireTranche(url.params);
     // Navigation en gardant (ou changeant) la tranche jours/heures
@@ -821,96 +864,162 @@
     var zone = document.getElementById("zone-ecran");
     ctx.zone = zone;
     ctx.rafraichir = function () { App.afficher(); };
-    if (DonneesTest.mode === "reelles" && horsApi(chemin)) {
-      // Pas de données inventées mélangées aux vraies : on explique pourquoi l'écran est vide.
-      zone.innerHTML = '<div class="carte"><div class="etat-vide"><div class="etat-vide-rond">' + ICONES.document + "</div><h3>Données non fournies par l'API Popina</h3>" +
-        '<p class="doux hors-api">Cet écran n\'a pas de source de vraies données. Pour le voir avec des données de démonstration, choisissez « Test » dans le menu du compte (bouton en haut à droite › Données).</p></div></div>';
-      window.scrollTo(0, 0);
-      return;
-    }
+    ctx.rafraichirDoux = function () { App.rafraichirDoux(); };
     if (App.meteoActif() && App.meteoBandeau && chemin.indexOf("/reports/sales-report/") === 0 && filtres.indexOf && filtres.indexOf("periode") >= 0) {
       App.meteoBandeau(ctx, document.getElementById("zone-meteo"));
     }
+    App.avantAffichage.forEach(function (f) { f(chemin, ctx, opts); });
     cfg.rendre(ctx, zone);
-    window.scrollTo(0, 0);
+    if (!opts.doux) window.scrollTo(0, 0);
     App.majAlertes();
+    App.apresAffichage.forEach(function (f) { f(chemin, ctx, opts); });
+  };
+  App.avantAffichage = []; // fonctions appelées avant chaque écran (encaissements de démo à l'arrivée)
+  App.apresAffichage = [];
+  // Redessine l'écran courant sans revenir en haut de page (mises à jour en direct). Rien si un menu ou un tiroir est ouvert.
+  App.rafraichirDoux = function () {
+    if (document.getElementById("tiroir") || document.querySelector(".menu-flottant.ouvert") || document.querySelector(".fenetre-fond")) return false;
+    var actif = document.activeElement;
+    if (actif && (actif.tagName === "INPUT" || actif.tagName === "SELECT" || actif.tagName === "TEXTAREA") && actif.closest && actif.closest("#page")) return false;
+    var page = document.getElementById("page"), y = window.scrollY;
+    page.style.minHeight = page.offsetHeight + "px";
+    App.afficher({ doux: true });
+    setTimeout(function () { window.scrollTo(0, y); page.style.minHeight = ""; }, 30);
+    return true;
   };
 
-  // Cloche d'alertes : produits dont le stock a atteint le seuil de réapprovisionnement (stocks factices, donc masquée en mode Réelles)
+  // Cloche d'alertes : produits dont le stock a atteint le seuil de réapprovisionnement
+  var alertesConnues = null;
   App.majAlertes = function () {
     var conteneur = document.getElementById("cloche-alertes");
-    if (DonneesTest.mode === "reelles") { conteneur.hidden = true; return Promise.resolve([]); }
     return DonneesTest.getAlertesStock().then(function (liste) {
       var bouton = conteneur.querySelector(".bouton-cloche");
       conteneur.hidden = false;
       bouton.innerHTML = ICONES.cloche + (liste.length ? '<span class="pastille-alerte">' + liste.length + "</span>" : "");
-      document.getElementById("menu-alertes").innerHTML = '<div class="alertes-titre">Réapprovisionnement</div>' + (liste.length ?
+      document.getElementById("menu-alertes").innerHTML = '<div class="alertes-titre">Réapprovisionnement <span class="badge-nouveau">Nouveau</span></div>' + (liste.length ?
         liste.map(function (a) {
           return '<a class="alerte-ligne" href="#/reports/stocks"><span class="alerte-nom">' + E(a.productName) + '</span><span class="alerte-detail ' + (a.quantity === 0 ? "rupture" : "") + '">' +
             (a.quantity === 0 ? "Rupture" : "Stock " + a.quantity) + " · seuil " + a.seuil + "</span></a>";
         }).join("") : '<div class="alerte-vide">Aucun produit sous son seuil.</div>');
+      // Nouvelle alerte apparue pendant la visite : on prévient
+      if (alertesConnues) liste.forEach(function (a) { if (!alertesConnues[a.id]) App.info("Alerte stock : " + a.productName + " a atteint son seuil (" + a.quantity + " ≤ " + a.seuil + ")."); });
+      alertesConnues = {};
+      liste.forEach(function (a) { alertesConnues[a.id] = true; });
       return liste;
     });
   };
 
   // ======================================================================
-  // En-tête : menu du compte, thème
+  // Petite fenêtre au centre de l'écran (changer d'organisation, confirmations...)
   // ======================================================================
-  var theme = "systeme";
+  App.fenetre = function (titre, corps, pied) {
+    App.fermerFenetre();
+    var fond = document.createElement("div");
+    fond.className = "fenetre-fond"; fond.id = "fenetre";
+    fond.innerHTML = '<div class="fenetre" role="dialog" aria-label="' + E(titre) + '"><div class="fenetre-tete"><h3>' + E(titre) + '</h3><button class="fermer" data-fermer-fenetre aria-label="Fermer">✕</button></div>' +
+      '<div class="fenetre-corps">' + corps + "</div>" + (pied ? '<div class="fenetre-pied">' + pied + "</div>" : "") + "</div>";
+    fond.addEventListener("click", function (e) { if (e.target === fond || (e.target.closest && e.target.closest("[data-fermer-fenetre]"))) App.fermerFenetre(); });
+    document.body.appendChild(fond);
+    return fond.firstChild;
+  };
+  App.fermerFenetre = function () { var f = document.getElementById("fenetre"); if (f) f.parentNode.removeChild(f); };
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") App.fermerFenetre(); });
+
+  // ======================================================================
+  // En-tête : menu du compte, thème, météo, démo
+  // ======================================================================
+  var theme = "systeme", S = window.Stockage;
   function appliquerTheme() {
     var sombre = theme === "sombre" || (theme === "systeme" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.setAttribute("data-theme", sombre ? "dark" : "light");
   }
   App.demarrer = function () {
-    try { theme = localStorage.getItem("theme-copie") || "systeme"; } catch (e) { /* stockage indisponible */ }
+    theme = S.lire("theme", "systeme");
     appliquerTheme();
-    DonneesTest.getLocations().then(function (sites) {
+    document.getElementById("page").innerHTML = '<div class="chargement"><span class="chargement-rond"></span>Chargement de la démo…</div>';
+    DonneesTest.pret().then(function () { return Promise.all([DonneesTest.getLocations(), DonneesTest.getProfile()]); }).then(function (r) {
+      var sites = r[0];
+      App.profil = r[1];
       App.siteNom = sites[0].name; App.siteSigle = sites[0].sigle;
       document.getElementById("nom-site").textContent = App.siteNom;
       document.getElementById("avatar-site").textContent = App.siteSigle;
-      document.getElementById("badge-mode").hidden = DonneesTest.mode !== "reelles";
       construireMenuCompte();
-      window.addEventListener("hashchange", App.afficher);
+      window.addEventListener("hashchange", function () { App.afficher(); });
       if (!location.hash || location.hash === "#") location.hash = "/";
       else App.afficher();
     });
   };
   function construireMenuCompte() {
-    function ch(id, libelle, act, ic) { return '<button class="choix-compte" data-act="' + act + '">' + (ic || "") + libelle + "</button>"; }
     function themeBtn(v, ic) { return '<button class="' + (theme === v ? "actif" : "") + '" data-act="theme" data-val="' + v + '">' + ic + "</button>"; }
+    var meteo = App.meteoActif(), ville = window.MeteoDemo ? MeteoDemo.ville() : { nom: "Rennes" };
     document.getElementById("menu-compte").innerHTML =
-      '<div class="compte-mail">demo@exemple.test</div>' +
+      '<div class="compte-mail">' + E(App.profil ? App.profil.email : "demo@exemple.test") + "</div>" +
       '<div class="compte-ligne"><span>' + ICONES.soleil + 'Thème</span><div class="segment">' + themeBtn("clair", ICONES.soleil) + themeBtn("sombre", ICONES.lune) + themeBtn("systeme", ICONES.ecran) + "</div></div>" +
-      '<div class="compte-ligne"><span>' + ICONES.cible + 'Langue</span><select><option>Français</option></select></div>' +
-      '<div class="compte-ligne"><span>' + ICONES.stocks + 'Données</span><div class="segment">' +
-      '<button class="' + (DonneesTest.mode === "test" ? "actif" : "") + '" data-act="donnees" data-val="test">Test</button>' +
-      '<button class="' + (DonneesTest.mode === "reelles" ? "actif" : "") + '" data-act="donnees" data-val="reelles">Réelles</button></div></div>' +
-      '<div class="compte-note">' + (DonneesTest.reelDisponible ? "Données réelles du " + E(DonneesTest.recupereLe) : "Pas de données réelles : lancez outils\\Mettre-a-jour-les-donnees.bat") + "</div>" +
-      '<div class="compte-ligne"><span>' + ICONES.soleil + 'Météo</span><div class="segment">' +
-      '<button class="' + (App.meteoActif() ? "" : "actif") + '" data-act="meteo" data-val="0">Off</button>' +
-      '<button class="' + (App.meteoActif() ? "actif" : "") + '" data-act="meteo" data-val="1">On</button></div></div>' +
-      (App.meteoActif() ? '<div class="compte-note">Ville : outils\\meteo-lieu.txt (sinon celle du lieu). Mise à jour : Lancer Pop\'IA.bat.</div>' : "") +
+      '<div class="compte-ligne"><span>' + ICONES.cible + 'Langue</span><select aria-label="Langue"><option>Français</option></select></div>' +
+      '<div class="compte-ligne"><span>' + ICONES.soleil + 'Météo <span class="badge-nouveau">Nouveau</span></span><div class="segment">' +
+      '<button class="' + (meteo ? "" : "actif") + '" data-act="meteo" data-val="0">Off</button>' +
+      '<button class="' + (meteo ? "actif" : "") + '" data-act="meteo" data-val="1">On</button></div></div>' +
+      (meteo ? '<div class="compte-ville"><span class="doux">Ville</span><b>' + E(ville.nom) + '</b><button class="lien-bouton" data-act="ville">Modifier</button></div>' +
+        '<div class="compte-recherche" id="compte-recherche" hidden><input type="search" id="ville-q" placeholder="Rechercher une ville…" autocomplete="off" aria-label="Rechercher une ville"><div id="ville-res"></div></div>' : "") +
+      '<button class="choix-compte" data-act="reinit">' + ICONES.courbe + "Réinitialiser la démo</button>" +
       '<a class="choix-compte" href="#/settings/profile">' + ICONES.engrenage + "Réglages</a>" +
       '<a class="choix-compte" href="#/integrations">' + ICONES.options + "Intégrations</a><hr>" +
-      '<button class="choix-compte doux" data-act="nondispo">Conditions d\'utilisation</button>' +
-      '<button class="choix-compte doux" data-act="nondispo">Politique de confidentialité</button>' +
-      '<button class="choix-compte doux" data-act="nondispo">Mentions légales</button><hr>' +
-      '<button class="choix-compte" data-act="nondispo">' + ICONES.grille + "Changer d'organisation</button><hr>" +
-      '<button class="choix-compte" data-act="nondispo">' + ICONES.liste + "Se déconnecter</button>";
+      '<a class="choix-compte doux" href="#/legal/cgu">Conditions d\'utilisation</a>' +
+      '<a class="choix-compte doux" href="#/legal/confidentialite">Politique de confidentialité</a>' +
+      '<a class="choix-compte doux" href="#/legal/mentions">Mentions légales</a><hr>' +
+      '<button class="choix-compte" data-act="organisation">' + ICONES.grille + "Changer d'organisation</button><hr>" +
+      '<button class="choix-compte" data-act="deconnexion">' + ICONES.liste + "Se déconnecter</button>";
     App.actGlobal.theme = function (v) {
-      theme = v; try { localStorage.setItem("theme-copie", v); } catch (e) { /* ignoré */ }
+      theme = v; S.ecrire("theme", v);
       appliquerTheme(); construireMenuCompte();
       document.getElementById("menu-compte").classList.add("ouvert");
     };
-    App.actGlobal.donnees = function (v) {
-      if (v === "reelles" && !DonneesTest.reelDisponible) { App.info("Aucune donnée réelle : lancez outils\\Mettre-a-jour-les-donnees.bat."); return; }
-      try { localStorage.setItem("donnees-copie", v); } catch (e) { App.info("Stockage du navigateur indisponible."); return; }
-      location.reload();
-    };
     App.actGlobal.meteo = function (v) {
-      try { localStorage.setItem("meteo-copie", v); } catch (e) { App.info("Stockage du navigateur indisponible."); return; }
+      MeteoDemo.activer(v === "1");
+      construireMenuCompte(); App.afficher();
+      App.info(v === "1" ? "Météo activée." : "Météo désactivée.");
+    };
+    App.actGlobal.ville = function () {
+      var b = document.getElementById("compte-recherche");
+      document.getElementById("menu-compte").classList.add("ouvert");
+      b.hidden = false;
+      var q = document.getElementById("ville-q"), res = document.getElementById("ville-res"), minuteur = null;
+      q.focus();
+      q.oninput = function () {
+        clearTimeout(minuteur);
+        var v = q.value;
+        minuteur = setTimeout(function () {
+          if (v.trim().length < 2) { res.innerHTML = ""; return; }
+          res.innerHTML = '<div class="doux petit ville-attente">Recherche…</div>';
+          MeteoDemo.rechercher(v).then(function (l) {
+            if (q.value !== v) return;
+            res.innerHTML = l.length ? l.map(function (x, i) { return '<button class="choix-ville" data-i="' + i + '"><b>' + E(x.nom) + '</b><span class="doux petit">' + E(x.detail) + "</span></button>"; }).join("") :
+              '<div class="doux petit ville-attente">Aucune ville trouvée.</div>';
+            Array.prototype.forEach.call(res.querySelectorAll(".choix-ville"), function (btn) {
+              btn.onclick = function (e) {
+                e.stopPropagation();
+                var x = l[+btn.getAttribute("data-i")];
+                res.innerHTML = '<div class="doux petit ville-attente">Chargement de la météo de ' + E(x.nom) + "…</div>";
+                MeteoDemo.choisirVille(x).then(function () { construireMenuCompte(); App.afficher(); App.info("Météo affichée pour " + x.nom + "."); });
+              };
+            });
+          });
+        }, 250);
+      };
+    };
+    App.actGlobal.reinit = function () {
+      if (!window.confirm("Réinitialiser la démo ? Les modifications faites dans ce navigateur (stocks, objectifs, produits, clients, réservations, réglages…) seront effacées.")) return;
+      S.toutEffacer();
+      location.hash = "/";
       location.reload();
     };
+    App.actGlobal.organisation = function () {
+      App.fenetre("Changer d'organisation",
+        '<p class="doux">Choisissez l\'organisation à afficher.</p><button class="ligne-orga actif" data-fermer-fenetre><span class="badge-site">' + E(App.siteSigle) + "</span><span><b>" + E(App.siteNom) + '</b><span class="doux petit">1 site · Rennes</span></span><span class="coche-orga">✓</span></button>',
+        '<button class="bouton" data-fermer-fenetre>Fermer</button>');
+    };
+    App.actGlobal.deconnexion = function () { S.ecrire("deconnecte", true); location.hash = "/connexion"; };
     App.actGlobal.nondispo = App.nonDispo;
   }
+  App.construireMenuCompte = construireMenuCompte;
 })();

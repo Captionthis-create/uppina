@@ -1,6 +1,6 @@
 /*
  * ecrans-pdv.js : écrans de la section « Point de vente » (catalogue et réglages de la caisse).
- * Les boutons de création/modification affichent « non disponible » : la copie est en lecture seule.
+ * Les créations et modifications sont enregistrées dans le navigateur (DonneesTest), la caisse n'est jamais modifiée.
  */
 (function () {
   "use strict";
@@ -8,7 +8,11 @@
   var PDV = "/point-of-sale/";
 
   function fil(nom, reglage) { return reglage ? ["Réglages", nom] : ["Point-of-sale", nom]; }
-  function creer(libelle) { A.act.creer = A.nonDispo; return A.bouton(libelle, "creer", { classe: "sombre" }); }
+  function creer(libelle, act) { return A.bouton(libelle, act || "creer", { classe: "sombre" }); }
+  function detailTiroir(titre, sous, corps) {
+    return A.tiroir('<div class="tiroir-tete"><div><h3>' + E(titre) + "</h3>" + (sous ? '<span class="doux">' + sous + "</span>" : "") + '</div><button class="fermer" data-act="fermer-tiroir">✕</button></div><div class="tiroir-corps">' + corps + "</div>");
+  }
+  function nouveauBadge(x) { return x && x.ajoute ? ' <span class="badge-bon neutre">Ajouté</span>' : ""; }
   function exportCsv() { return A.bouton("Exporter CSV", "export", { classe: "bouton-export", chevron: true }); }
   function rgba(hex, a) {
     var n = parseInt(hex.slice(1), 16);
@@ -280,13 +284,14 @@
     section: "pdv", fil: fil("Mise en page"), filtres: [],
     rendre: function (ctx, zone) {
       var et = ctx.etat;
-      D.getLayout().then(function (cats) {
-        var ci = et.cat || 0, si = et.sous || 0, cat = cats[ci], sous = cat.sous[si] || cat.sous[0];
+      D.getLayout().then(function (lay) {
+        var cats = lay.categories.filter(function (c) { return !c.masquee; }), masquees = lay.categories.filter(function (c) { return c.masquee; });
+        var ci = Math.min(et.cat || 0, cats.length - 1), si = et.sous || 0, cat = cats[ci], sous = cat.sous[si] || cat.sous[0];
         var colCats = cats.map(function (c, i) {
-          return '<button class="lay-cat' + (i === ci ? " actif" : "") + '" style="--c:' + c.couleur + '" data-act="lay-cat" data-val="' + i + '"><i style="background:' + c.couleur + '"></i><span>' + E(c.nom) + "</span></button>";
+          return '<button class="lay-cat' + (i === ci ? " actif" : "") + '" style="--c:' + c.couleur + '" data-act="lay-cat" data-val="' + i + '"><i style="background:' + c.couleur + '"></i><span>' + E(c.libelle) + "</span></button>";
         }).join("");
-        var colSous = cat.sous.map(function (s, i) {
-          return '<button class="lay-sous' + (i === si ? " actif" : "") + '" style="background:' + rgba(cat.couleur, i === si ? 0.28 : 0.12) + '" data-act="lay-sous" data-val="' + i + '">' + E(s.nom) + "</button>";
+        var colSous = cat.sous.map(function (x, i) {
+          return '<button class="lay-sous' + (i === si ? " actif" : "") + '" style="background:' + rgba(cat.couleur, i === si ? 0.28 : 0.12) + '" data-act="lay-sous" data-val="' + i + '">' + E(x.nom) + "</button>";
         }).join("");
         var tuiles = sous.produits.map(function (p) {
           return '<div class="lay-tuile" style="background:' + rgba(cat.couleur, 0.3) + ';color:' + cat.couleur + '"><b>' + E(p.nom) + "</b><span>" + A.euro(p.prix) + "</span></div>";
@@ -294,26 +299,49 @@
         for (var k = sous.produits.length; k < 6; k++) tuiles += '<div class="lay-tuile vide"></div>';
         A.act["lay-cat"] = function (v) { et.cat = +v; et.sous = 0; ctx.rafraichir(); };
         A.act["lay-sous"] = function (v) { et.sous = +v; ctx.rafraichir(); };
-        A.act["lay-sup"] = A.nonDispo;
+        A.act["lay-sup"] = function () {
+          if (!window.confirm("Retirer « " + cat.libelle + " » de la mise en page de la caisse ? Les produits restent dans le catalogue.")) return;
+          D.setLayout({ categorie: cat.nom, masquee: true }).then(function () { et.cat = 0; et.sous = 0; A.info("« " + cat.libelle + " » retirée de la mise en page."); ctx.rafraichir(); });
+        };
+        A.act["lay-retablir"] = function (nom) { D.setLayout({ categorie: nom, masquee: false }).then(function () { A.info("Catégorie rétablie."); ctx.rafraichir(); }); };
+        A.act["lay-ok"] = function () {
+          D.setLayout({ nbCategories: document.getElementById("lay-nb").value }).then(function () {
+            return D.setLayout({ categorie: cat.nom, libelle: document.getElementById("lay-nom").value, nbMenus: document.getElementById("lay-menus").value });
+          }).then(function () { A.info("Mise en page enregistrée."); ctx.rafraichir(); }, function (m) { A.info(String(m)); });
+        };
         zone.innerHTML = A.carte("Mise en page",
-          '<div class="lay-reglage"><div><b>Nombre de catégories visibles</b><div class="doux">Choisissez le nombre de catégories à afficher sur le caissier</div></div><input class="champ" value="12" readonly></div>' +
+          '<div class="lay-reglage"><div><b>Nombre de catégories visibles</b><div class="doux">Choisissez le nombre de catégories à afficher sur le caissier</div></div><input class="champ" id="lay-nb" type="number" min="1" max="24" value="' + lay.nbCategories + '"></div>' +
           '<div class="lay-editeur"><div class="lay-col lay-cats">' + colCats + '</div><div class="lay-col lay-soustitres">' + colSous + '</div><div class="lay-grille">' + tuiles + "</div>" +
-          '<div class="lay-props"><div class="lay-props-t">' + A.icones.cible + " " + E(cat.nom) + '</div><label>Nom<input class="champ" value="' + E(cat.nom) + '" readonly></label>' +
-          '<label>Color<div class="champ"><i class="carre" style="background:' + cat.couleur + '"></i> ' + E(cat.nom) + '</div></label><label>Logo<div class="champ">' + A.icones.couverts + ' logo</div></label>' +
-          '<label>Modifier le nombre de menus affichés<input class="champ" value="' + cat.nbMenus + '" readonly></label><button class="bouton rouge" data-act="lay-sup">Supprimer la catégorie</button></div></div>');
+          '<div class="lay-props"><div class="lay-props-t">' + A.icones.cible + " " + E(cat.libelle) + '</div><label>Nom<input class="champ" id="lay-nom" value="' + E(cat.libelle) + '"></label>' +
+          '<label>Couleur<div class="champ"><i class="carre" style="background:' + cat.couleur + '"></i> ' + E(cat.couleur) + '</div></label><label>Logo<div class="champ">' + A.icones.couverts + ' logo</div></label>' +
+          '<label>Modifier le nombre de menus affichés<input class="champ" id="lay-menus" type="number" min="0" max="20" value="' + cat.nbMenus + '"></label>' +
+          '<button class="bouton sombre" data-act="lay-ok">Enregistrer</button><button class="bouton rouge" data-act="lay-sup">Supprimer la catégorie</button></div></div>' +
+          (masquees.length ? '<div class="lay-masquees doux petit">Retirées de la mise en page : ' + masquees.map(function (c) { return E(c.libelle) + ' <a class="lien-souligne" data-act="lay-retablir" data-val="' + E(c.nom) + '">rétablir</a>'; }).join(" · ") + "</div>" : ""));
       });
     }
   });
 
   // ---------- Options ----------
   A.ecran(PDV + "modifiers", {
-    section: "pdv", fil: fil("Modifiers"), actions: function () { return creer("Créer une option"); },
+    section: "pdv", fil: fil("Modifiers"), actions: function () { return creer("Créer une option", "creerOption"); },
     filtres: ['<div class="filtres-droite"><label class="champ-recherche">' + A.icones.loupe + '<input type="search" placeholder="Rechercher" data-recherche></label></div>'],
     rendre: function (ctx, zone) {
+      A.act.creerOption = function () {
+        var lignes = "";
+        for (var i = 0; i < 5; i++) lignes += '<div class="ligne-valeur">' + A.champ("opt-v" + i, i ? "Valeur " + (i + 1) : "Valeur 1", "", { ph: i ? "(facultatif)" : "ex. Saignant" }) + A.champ("opt-p" + i, "Prix (€)", "0", { type: "number", min: 0, step: "0.1", inputmode: "decimal" }) + "</div>";
+        A.tiroirFormulaire("Créer une option", "Un groupe d'options proposé à la caisse (cuisson, parfum, supplément…).", A.champ("opt-nom", "Nom de l'option", "", { ph: "ex. Garniture" }) + lignes, "Créer l'option", function (v) {
+          var vals = []; for (var k = 0; k < 5; k++) vals.push({ nom: v("opt-v" + k), prix: v("opt-p" + k) });
+          return D.createModifierGroup({ nom: v("opt-nom"), valeurs: vals }).then(function (g) { A.fermerTiroir(); A.info("Option « " + g.nom + " » créée."); ctx.rafraichir(); });
+        });
+      };
       D.getAllModifierGroups().then(function (l) {
+        A.act.voirOption = function (id) {
+          var g = l.filter(function (x) { return x.id === id; })[0];
+          detailTiroir(g.nom, g.valeurs.length + " valeurs", A.table([{ t: "Valeur" }, { a: "d", t: "Prix" }], g.valeurs.map(function (x) { return [E(x.nom), x.prix ? "+ " + A.euro(x.prix) : "Gratuit"]; }), null, { classe: "zebre" }));
+        };
         function dessiner(q) {
           zone.innerHTML = l.filter(function (g) { return !q || g.nom.toLowerCase().indexOf(q.toLowerCase()) >= 0; }).map(function (g) {
-            return '<div class="ligne-carte"><span class="poignee">⋮⋮</span><b>' + E(g.nom) + '</b><span class="doux petit">' + g.valeurs.length + " Valeurs</span></div>";
+            return '<button class="ligne-carte cliquable-l" data-act="voirOption" data-val="' + E(g.id) + '"><span class="poignee">⋮⋮</span><b>' + E(g.nom) + '</b>' + nouveauBadge(g) + '<span class="doux petit">' + g.valeurs.length + " Valeurs</span></button>";
           }).join("");
         }
         dessiner("");
@@ -324,21 +352,38 @@
 
   // ---------- Menus ----------
   A.ecran(PDV + "meals", {
-    section: "pdv", fil: fil("Meals"), actions: function () { return creer("Créer un menu"); }, filtres: [],
+    section: "pdv", fil: fil("Meals"), actions: function () { return creer("Créer un menu", "creerMenu"); }, filtres: [],
     rendre: function (ctx, zone) {
+      A.act.creerMenu = function () {
+        A.tiroirFormulaire("Créer un menu", "Une formule vendue à prix fixe (ex. galette + crêpe + boisson).",
+          A.champ("mn-nom", "Nom du menu", "", { ph: "ex. Formule soir" }) + A.champ("mn-prix", "Prix TTC (€)", "", { type: "number", min: 0, step: "0.1", inputmode: "decimal" }) +
+          A.champ("mn-etapes", "Étapes (séparées par des virgules)", "Entrée, Plat, Dessert"), "Créer le menu", function (v) {
+            return D.createMeal({ nom: v("mn-nom"), prix: v("mn-prix"), etapes: v("mn-etapes").split(",") }).then(function (m) { A.fermerTiroir(); A.info("Menu « " + m.nom + " » créé."); ctx.rafraichir(); });
+          });
+      };
       D.getAllMeals().then(function (l) {
-        zone.innerHTML = grille(l.map(function (m) { return '<div class="carte-simple"><b>' + E(m.nom) + '</b> <span class="doux petit">' + m.etapes.length + " Étapes</span></div>"; }), 2);
+        A.act.voirMenu = function (id) {
+          var m = l.filter(function (x) { return x.id === id; })[0];
+          detailTiroir(m.nom, A.euro(m.prix) + " · " + m.etapes.length + " étapes", '<ol class="doc-etapes">' + m.etapes.map(function (e) { return "<li>" + E(e) + "</li>"; }).join("") + "</ol>");
+        };
+        zone.innerHTML = grille(l.map(function (m) { return '<button class="carte-simple cliquable-l" data-act="voirMenu" data-val="' + E(m.id) + '"><b>' + E(m.nom) + '</b>' + nouveauBadge(m) + ' <span class="doux petit">' + m.etapes.length + " Étapes · " + A.euro(m.prix) + "</span></button>"; }), 2);
       });
     }
   });
 
   // ---------- Employés (jamais de code PIN) ----------
   A.ecran(PDV + "employees", {
-    section: "pdv", fil: fil("Employees"), actions: function () { return creer("Créer un employé"); }, filtres: [],
+    section: "pdv", fil: fil("Employees"), actions: function () { return creer("Créer un employé", "creerEmploye"); }, filtres: [],
     rendre: function (ctx, zone) {
+      A.act.creerEmploye = function () {
+        A.tiroirFormulaire("Créer un employé", "Il pourra se connecter à la caisse avec son code (défini sur la caisse).",
+          A.champ("em-nom", "Nom affiché sur la caisse", "", { ph: "ex. Léa" }) + A.champ("em-role", "Poste (facultatif)", "", { ph: "ex. Serveuse" }), "Créer l'employé", function (v) {
+            return D.createEmployee({ name: v("em-nom"), role: v("em-role") }).then(function (e) { A.fermerTiroir(); A.info(e.name + " ajouté à l'équipe."); ctx.rafraichir(); });
+          });
+      };
       D.getEmployeesPos().then(function (l) {
         zone.innerHTML = grille(l.map(function (e) {
-          return '<div class="carte-simple"><b>' + E(e.name) + "</b>" + (e.isOwner ? ' <span class="badge-actif on"><i></i>Propriétaire</span>' : "") + "</div>";
+          return '<div class="carte-simple"><b>' + E(e.name) + "</b>" + (e.isOwner ? ' <span class="badge-actif on"><i></i>Propriétaire</span>' : "") + nouveauBadge(e) + (e.role ? '<div class="doux petit">' + E(e.role) + "</div>" : "") + "</div>";
         }), 3);
       });
     }
@@ -379,16 +424,23 @@
 
   // ---------- Réglages : postes de préparation ----------
   A.ecran(PDV + "settings/prepa-stations", {
-    section: "pdv", fil: fil("Postes de préparation", true), actions: function () { return creer("Ajouter un poste"); },
+    section: "pdv", fil: fil("Postes de préparation", true), actions: function () { return creer("Ajouter un poste", "creerPoste"); },
     filtres: function (ctx) {
       var et = ctx.etat;
       return A.liste("pp-imp", "Sélectionner une imprimante", ["Bar", "Cuisine", "Crêperie", "Dessert", "Imprimante Ticket"].map(function (x) { return [x, x]; }), et.imp, function (v) { et.imp = v; ctx.rafraichir(); });
     },
     rendre: function (ctx, zone) {
       var et = ctx.etat;
+      A.act.creerPoste = function () {
+        A.tiroirFormulaire("Ajouter un poste de préparation", "Les produits du poste s'impriment sur l'imprimante choisie.",
+          A.champ("pp-nom", "Nom du poste", "", { ph: "ex. Plancha" }) + '<label>Imprimante<select id="pp-imp">' + ["Bar", "Cuisine", "Crêperie", "Dessert", "Imprimante Ticket"].map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</select></label>" +
+          '<label class="case"><input type="checkbox" id="pp-recap" checked> Imprimer un récapitulatif</label>', "Ajouter le poste", function (v) {
+            return D.createPreparationStation({ name: v("pp-nom"), imprimante: v("pp-imp"), recap: v("pp-recap") }).then(function (x) { A.fermerTiroir(); A.info("Poste « " + x.name + " » ajouté."); ctx.rafraichir(); });
+          });
+      };
       D.getAllPreparationStations().then(function (l) {
         zone.innerHTML = l.filter(function (s) { return !et.imp || s.imprimante === et.imp; }).map(function (s) {
-          return '<div class="ligne-carte"><b>' + E(s.name) + "</b>" + (s.recap ? ' <span class="badge-actif recap"><i></i>Récap</span>' : "") + "</div>";
+          return '<div class="ligne-carte"><b>' + E(s.name) + "</b>" + (s.recap ? ' <span class="badge-actif recap"><i></i>Récap</span>' : "") + nouveauBadge(s) + '<span class="td-espace"></span><span class="doux petit">' + A.icones.couche + " " + E(s.imprimante) + "</span></div>";
         }).join("");
       });
     }
@@ -411,11 +463,15 @@
 
   // ---------- Réglages : taxes ----------
   A.ecran(PDV + "settings/taxes", {
-    section: "pdv", fil: fil("Taxes", true), actions: function () { return creer("Créer une taxe"); }, filtres: [],
+    section: "pdv", fil: fil("Taxes", true), actions: function () { return creer("Créer une taxe", "creerTaxe"); }, filtres: [],
     rendre: function (ctx, zone) {
+      A.act.creerTaxe = function () {
+        A.tiroirFormulaire("Créer une taxe", "Taux appliqué aux produits qui l'utilisent.", A.champ("tx-nom", "Nom", "", { ph: "ex. TVA 2,1%" }) + A.champ("tx-taux", "Taux (%)", "", { type: "number", min: 0, max: 100, step: "0.1", inputmode: "decimal" }),
+          "Créer la taxe", function (v) { return D.createTax({ name: v("tx-nom"), rate: v("tx-taux") }).then(function (t) { A.fermerTiroir(); A.info("Taxe « " + t.name + " » créée."); ctx.rafraichir(); }); });
+      };
       D.getAllTaxes().then(function (l) {
         zone.innerHTML = grille(l.map(function (t) {
-          return '<div class="carte-simple haute"><b>' + E(t.name) + '</b><div>' + A.decimal(t.rate).replace(",", ".") + ' %</div><a class="lien-doux" href="#' + PDV + 'products-list">Voir les produits</a></div>';
+          return '<div class="carte-simple haute"><b>' + E(t.name) + nouveauBadge(t) + '</b><div>' + A.decimal(t.rate).replace(",", ".") + " % · " + t.nbProduits + " produit" + (t.nbProduits > 1 ? "s" : "") + '</div><a class="lien-doux" href="#' + PDV + 'products-list">Voir les produits</a></div>';
         }), 3);
       });
     }
@@ -423,11 +479,16 @@
 
   // ---------- Réglages : remises ----------
   A.ecran(PDV + "settings/discounts", {
-    section: "pdv", fil: fil("Remises", true), actions: function () { return creer("Créer une remise"); }, filtres: [],
+    section: "pdv", fil: fil("Remises", true), actions: function () { return creer("Créer une remise", "creerRemise"); }, filtres: [],
     rendre: function (ctx, zone) {
+      A.act.creerRemise = function () {
+        A.tiroirFormulaire("Créer une remise", "Proposée au moment de l'encaissement.", A.champ("rm-nom", "Nom", "", { ph: "ex. Happy hour" }) +
+          '<label>Type<select id="rm-type"><option value="percentage">Pourcentage</option><option value="amount">Montant fixe (€)</option></select></label>' + A.champ("rm-val", "Valeur", "", { type: "number", min: 0, step: "0.5", inputmode: "decimal" }),
+          "Créer la remise", function (v) { return D.createDiscount({ nom: v("rm-nom"), type: v("rm-type"), valeur: v("rm-val") }).then(function (x) { A.fermerTiroir(); A.info("Remise « " + x.nom + " » créée."); ctx.rafraichir(); }); });
+      };
       D.getDiscounts().then(function (l) {
         zone.innerHTML = grille(l.map(function (r) {
-          return '<div class="carte-simple haute"><b>' + E(r.nom) + "</b><div>" + (r.type === "amount" ? A.decimal(r.valeur).replace(",", ".") + " €" : A.decimal(r.valeur).replace(",", ".") + " %") + "</div></div>";
+          return '<div class="carte-simple haute"><b>' + E(r.nom) + nouveauBadge(r) + "</b><div>" + (r.type === "amount" ? A.decimal(r.valeur).replace(",", ".") + " €" : A.decimal(r.valeur).replace(",", ".") + " %") + "</div></div>";
         }), 3);
       });
     }
@@ -435,10 +496,14 @@
 
   // ---------- Réglages : mouvements de caisse ----------
   A.ecran(PDV + "settings/cash-movements", {
-    section: "pdv", fil: fil("Mouvements de caisse", true), actions: function () { return creer("Créer un mouvement"); }, filtres: [],
+    section: "pdv", fil: fil("Mouvements de caisse", true), actions: function () { return creer("Créer un mouvement", "creerMouvement"); }, filtres: [],
     rendre: function (ctx, zone) {
+      A.act.creerMouvement = function () {
+        A.tiroirFormulaire("Créer un mouvement de caisse", "Motif proposé lors d'une entrée ou d'une sortie d'espèces.", A.champ("mv-nom", "Motif", "", { ph: "ex. Pourboires reversés" }),
+          "Créer le mouvement", function (v) { return D.createCashMovementReason({ name: v("mv-nom") }).then(function (x) { A.fermerTiroir(); A.info("Mouvement « " + x.name + " » créé."); ctx.rafraichir(); }); });
+      };
       D.getCashMovementReasons().then(function (l) {
-        zone.innerHTML = grille(l.map(function (r) { return '<div class="carte-simple"><b>' + E(r.name) + "</b></div>"; }), 3);
+        zone.innerHTML = grille(l.map(function (r) { return '<div class="carte-simple"><b>' + E(r.name) + "</b>" + nouveauBadge(r) + "</div>"; }), 3);
       });
     }
   });
@@ -465,11 +530,18 @@
 
   // ---------- Réglages : modes de paiement ----------
   A.ecran(PDV + "settings/payments", {
-    section: "pdv", fil: ["Réglages", "Mode de paiements"], actions: function () { return creer("Créer mode paiement"); }, filtres: [],
+    section: "pdv", fil: ["Réglages", "Mode de paiements"], actions: function () { return creer("Créer mode paiement", "creerPaiement"); }, filtres: [],
     rendre: function (ctx, zone) {
+      A.act.creerPaiement = function () {
+        A.tiroirFormulaire("Créer un mode de paiement", "Proposé à l'encaissement sur toutes les caisses.", A.champ("mp-nom", "Nom", "", { ph: "ex. Carte bancaire sans contact" }) +
+          '<label class="case"><input type="checkbox" id="mp-bon"> Bon d\'achat</label><label class="case"><input type="checkbox" id="mp-tiroir"> Ouvrir le tiroir-caisse</label><label class="case"><input type="checkbox" id="mp-tips"> Pourboires</label>',
+          "Créer le mode de paiement", function (v) {
+            return D.createPaymentMode({ name: v("mp-nom"), voucher: v("mp-bon"), openCashDrawer: v("mp-tiroir"), tips: v("mp-tips") }).then(function (x) { A.fermerTiroir(); A.info("Mode de paiement « " + x.name + " » créé."); ctx.rafraichir(); });
+          });
+      };
       D.getAllPayments().then(function (l) {
         zone.innerHTML = l.map(function (p) {
-          return '<div class="ligne-carte grande"><span class="poignee">⋮⋮</span><div><b>' + E(p.name) + "</b> " + badge(p.enabled) +
+          return '<div class="ligne-carte grande"><span class="poignee">⋮⋮</span><div><b>' + E(p.name) + "</b> " + badge(p.enabled) + nouveauBadge(p) +
             '<div class="doux petit">Bon d\'achat ' + onOff(p.voucher) + " &nbsp; Ouvrir le tiroir-caisse " + onOff(p.openCashDrawer) + " &nbsp; Pourboires " + onOff(p.tips) + "</div></div></div>";
         }).join("");
       });
@@ -535,7 +607,7 @@
       var et = ctx.etat;
       D.getMiscSettings().then(function (m) {
         if (!et.v) { et.v = {}; Object.keys(m).forEach(function (k) { et.v[k] = m[k]; }); }
-        var onglet = et.onglet || "gen", v = et.v;
+        var onglet = et.onglet || "gen", v = et.v, modifie = Object.keys(m).some(function (k) { return m[k] !== v[k]; });
         function inter(cle, titre, desc) {
           return '<div class="reglage"><div><b>' + titre + '</b><div class="doux petit">' + desc + '</div></div><button class="interrupteur' + (v[cle] ? " on" : "") + '" data-act="bascule" data-val="' + cle + '" aria-label="' + titre + '"><i></i></button></div>';
         }
@@ -554,15 +626,16 @@
         A.act.bascule = function (cle) { v[cle] = !v[cle]; ctx.rafraichir(); };
         zone.innerHTML = '<div class="carte"><div class="carte-tete"><h2>Réglages divers</h2></div><div class="onglets-bouton">' +
           [["gen", "Réglages généraux"], ["cmd", "Commandes"], ["cui", "Envoi en cuisine"]].map(function (o) { return '<button class="' + (o[0] === onglet ? "actif" : "") + '" data-act="onglet" data-val="' + o[0] + '">' + o[1] + "</button>"; }).join("") +
-          '</div><div class="carte-corps pad">' + contenu + '</div><div class="pied-formulaire"><button class="bouton large" data-act="creer">Annuler</button><button class="bouton large inactif" disabled>Sauvegarder</button></div></div>';
-        A.act.creer = A.nonDispo;
+          '</div><div class="carte-corps pad">' + contenu + '</div><div class="pied-formulaire"><button class="bouton large" data-act="divAnnuler"' + (modifie ? "" : " disabled") + '>Annuler</button><button class="bouton large sombre' + (modifie ? "" : " inactif") + '" data-act="divSauver"' + (modifie ? "" : " disabled") + ">Sauvegarder</button></div></div>";
+        A.act.divAnnuler = function () { et.v = null; ctx.rafraichir(); };
+        A.act.divSauver = function () { D.setMiscSettings(v).then(function () { et.v = null; A.info("Réglages enregistrés."); ctx.rafraichir(); }); };
       });
     }
   });
 
   // ---------- Réglages : appareils et contrats ----------
   A.ecran(PDV + "settings/devices-contracts", {
-    section: "pdv", fil: fil("Appareils et Contrats", true), actions: function () { return '<button class="bouton sombre inactif" disabled>Créer un appareil</button>'; }, filtres: [],
+    section: "pdv", fil: fil("Appareils et Contrats", true), actions: function () { return '<span class="info-bulle" title="Contrat : 7 appareils sur 7 utilisés. Pour en ajouter, faites évoluer votre contrat."><button class="bouton sombre inactif" disabled>Créer un appareil</button></span><span class="doux petit">7 appareils sur 7 utilisés</span>'; }, filtres: [],
     rendre: function (ctx, zone) {
       D.getLogicalDevices().then(function (r) {
         var c = r.contrat;
