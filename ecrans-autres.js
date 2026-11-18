@@ -553,18 +553,18 @@
         zone.innerHTML = cats.map(function (c) {
           return '<section class="integ" id="cat-' + E(c.categorie) + '"><div class="titre-groupe"><span>' + E(c.categorie) + "</span></div>" + '<div class="grille-cartes" style="--n:3">' +
             c.integrations.map(function (i) {
-              return '<button class="carte-integ" data-act="integ" data-val="' + E(i.nom) + '"><div class="integ-t"><span class="logo-carre">' + E(i.nom.charAt(0)) + "</span><b>" + E(i.nom) + "</b>" +
+              return '<button class="carte-integ" data-act="integ" data-val="' + E(c.categorie + "|" + i.nom) + '"><div class="integ-t"><span class="logo-carre">' + E(i.nom.charAt(0)) + "</span><b>" + E(i.nom) + "</b>" +
                 (i.active ? '<span class="badge-bon ok">Activée</span>' : "") + "</div><p>" + E(i.description) + "</p></button>";
             }).join("") + "</div></section>";
         }).join("");
-        A.act.integ = function (nom) {
-          var i = null, cat = "";
-          cats.forEach(function (c) { c.integrations.forEach(function (x) { if (x.nom === nom) { i = x; cat = c.categorie; } }); });
+        A.act.integ = function (val) {
+          var p = val.split("|"), cat = p[0], nom = p.slice(1).join("|"), i = null;
+          cats.forEach(function (c) { c.integrations.forEach(function (x) { if (x.nom === nom && !i) i = x; }); });
           if (!i) return;
           var t = A.tiroir('<div class="tiroir-tete"><div class="integ-t"><span class="logo-carre grand">' + E(i.nom.charAt(0)) + "</span><div><h3>" + E(i.nom) + '</h3><span class="doux">' + E(cat) + "</span></div></div>" +
             '<button class="fermer" data-act="fermer-tiroir">✕</button></div><div class="tiroir-corps"><p>' + E(i.description) + "</p>" +
             '<p class="doux">Statut : ' + (i.active ? '<span class="badge-bon ok">Activée</span>' : '<span class="badge-bon neutre">Non activée</span>') + "</p>" +
-            '<ul class="liste-points"><li>Installation en quelques minutes, sans matériel.</li><li>Les données circulent automatiquement avec la caisse.</li><li>Désactivable à tout moment.</li></ul></div>' +
+            "</div>" +
             '<div class="tiroir-pied"><button class="bouton" data-act="fermer-tiroir">Fermer</button><span class="td-espace"></span><button class="bouton ' + (i.active ? "" : "sombre") + '" data-integ-bascule>' + (i.active ? "Désactiver" : "Activer") + "</button></div>");
           t.querySelector("[data-integ-bascule]").onclick = function () {
             D.setIntegrationActive(i.nom, !i.active).then(function (on) { A.fermerTiroir(); A.info(i.nom + (on ? " est activée." : " est désactivée.")); ctx.rafraichir(); });

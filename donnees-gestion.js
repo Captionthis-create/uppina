@@ -434,40 +434,54 @@
   function getLinkedAccounts() { return reponse(S.lire("comptes-lies", { google: false, apple: false })); }
   function setLinkedAccount(fournisseur, lie) { var c = S.lire("comptes-lies", { google: false, apple: false }); c[fournisseur] = !!lie; S.ecrire("comptes-lies", c); return reponse(c); }
 
+  // Intégrations : liste et textes repris du vrai back-office (une même intégration peut apparaître dans plusieurs catégories)
   var CATEGORIES_INTEGRATIONS = [
-    ["Sélection", ["Commande Express", "ComptaLink", "StockMaster", "RH Simple", "Fidélio", "CaisseBI"]],
-    ["Gestion des stocks", ["StockMaster", "Inventaire+", "AchatPro", "Cave Manager"]],
-    ["Comptabilité", ["ComptaLink", "FacturePlus", "ExpertCompta"]],
-    ["E-Ticket", ["Ticket Digital", "Reçu Mail"]],
-    ["Business intelligence", ["CaisseBI", "Dataviz Resto"]],
-    ["Commandes en ligne", ["Commande Express", "Click & Collect", "Livraison Facile"]],
-    ["Solutions de Fidélité", ["Fidélio", "Cagnotte Club"]],
-    ["Ressources humaines", ["RH Simple", "Planning Équipe"]],
-    ["Développeur", ["API publique", "Webhooks"]]
+    ["Sélection", ["Popina Order", "Pennylane", "Gestion +", "Esperoo", "Inexweb", "Fulll"]],
+    ["Gestion des stocks", ["Gestion +", "Fullsoon", "SOMM'IT", "GoStan", "Inpulse", "Yokitup", "Koust"]],
+    ["Comptabilité", ["Evoliz", "Fulll", "Inexweb", "My Unisoft", "Pennylane", "Inqom", "CEGID", "Bleez", "ISA COMPTA", "Dext", "iPaidThat"]],
+    ["E-Ticket", ["Billiv"]],
+    ["Business Intelligence", ["Otami", "Skello", "Dvore", "N8N", "Foodforecast", "Orkelo"]],
+    ["Commandes en ligne", ["Popina Order"]],
+    ["Solutions de Fidélité", ["LittleBill", "Hey Pongo", "Qoodos", "Ticat", "Fidelatoo"]],
+    ["Ressources humaines", ["Esperoo"]],
+    ["Développeur", ["Accès développeur"]]
   ];
   var DESCRIPTIONS_INTEGRATIONS = {
-    "Commande Express": "Prise de commande à table par QR code : vos clients commandent et paient depuis leur téléphone, la commande arrive directement en caisse.",
-    "ComptaLink": "Envoie chaque jour les ventes, la TVA et les encaissements à votre logiciel de comptabilité.",
-    "StockMaster": "Suivi des stocks et des fiches techniques, décompte automatique à chaque vente.",
-    "RH Simple": "Plannings, pointage et préparation de la paie à partir des heures réellement travaillées.",
-    "Fidélio": "Programme de fidélité : points, récompenses et offres envoyées par SMS ou e-mail.",
-    "CaisseBI": "Tableaux de bord avancés et comparaison de plusieurs établissements.",
-    "Inventaire+": "Inventaires sur tablette, écarts de stock et valorisation en fin de mois.",
-    "AchatPro": "Commandes fournisseurs, réception des livraisons et rapprochement des factures.",
-    "Cave Manager": "Gestion de la cave à vins : références, millésimes, emplacements et rotation.",
-    "FacturePlus": "Factures et notes de frais pour vos clients professionnels, à partir des tickets de caisse.",
-    "ExpertCompta": "Accès direct de votre expert-comptable aux clôtures de caisse et aux exports.",
-    "Ticket Digital": "Le ticket de caisse envoyé par e-mail ou SMS au lieu d'être imprimé.",
-    "Reçu Mail": "Reçus de paiement envoyés automatiquement, avec votre logo.",
-    "Dataviz Resto": "Analyses de la carte (plats stars, plats à revoir) et de la rentabilité par service.",
-    "Click & Collect": "Commandes à emporter en ligne, payées à l'avance, prêtes à l'heure choisie.",
-    "Livraison Facile": "Centralise les commandes des plateformes de livraison dans la caisse.",
-    "Cagnotte Club": "Cagnotte et cartes cadeaux utilisables en caisse et en ligne.",
-    "Planning Équipe": "Plannings partagés avec l'équipe, échanges de services et alertes de dépassement.",
-    "API publique": "Accès en lecture aux ventes, au catalogue et aux clients pour vos propres outils.",
-    "Webhooks": "Notifications en temps réel (commande, clôture de caisse) vers vos applications."
+    "Popina Order": "Une solution intuitive pour la livraison et la vente à emporter pour votre restaurant.",
+    "Pennylane": "Pennylane rassemble tous les outils et toutes les intégrations nécessaires pour gérer l’ensemble de vos dépenses, votre facturation, votre trésorerie ainsi que votre comptabilité.",
+    "Gestion +": "Logiciel de gestion des factures fournisseurs et des stocks : un outil puissant pour accroître votre performance.",
+    "Esperoo": "Gérez facilement votre personnel avec une solution RH complète et intuitive. Esperoo vous accompagne au quotidien dans la gestion du personnel, des plannings, des absences et bien plus encore.",
+    "Inexweb": "Inexweb est une plateforme collaborative proposée à ses clients par le groupe In Extenso, cabinet national leader de l’expertise comptable des services professionnels pour les TPE-PME en France. Avec un réseau de 6 200 collaborateurs et plus de 250 agences réparties sur tout le territoire, In Extenso propose aux chefs d’entreprises, artisans, commerçants, professions libérales et responsables d’associations un service professionnel complet, à tous les stades de la vie de leur entreprise et sur l’ensemble des domaines liés à la gestion de leur activité : comptabilité, fiscalité, gestion, juridique, conseil social et paies, gestion du patrimoine, conseil en innovation-croissance, conseil en tourisme, culture et hôtellerie, transmission d’entreprise. In Extenso est l’interlocuteur privilégié de plus de 130 000 clients appartenant à tous les secteurs d’activité.",
+    "Fulll": "Aujourd’hui, notre mission est d’accompagner les experts-comptables dans le pilotage de leur activité, en mettant à leur disposition des outils innovants, complets, agiles et évolutifs qui simplifient la collaboration avec leurs clients (TPE/PME) tout en les accompagnant dans la mise en place de leur méthode de travail.",
+    "Fullsoon": "Fullsoon constitue un véritable outil décisionnel vous permettant d’anticiper vos ventes, optimiser la gestion de vos stocks et accélérer le développement de vos établissements.",
+    "SOMM'IT": "SOMM'IT a été créé à partir d’un constat fait par des sommeliers POUR des restaurateurs. La solution a été conçue pour améliorer la rentabilité des restaurateurs à travers la carte des vins.",
+    "GoStan": "Maîtrisez votre stock de boissons, pilotez votre stratégie commerciale et augmentez vos revenus. GoStan s’emploie à mettre la technologie et l’intelligence de la donnée au service de vos objectifs.",
+    "Inpulse": "Inpulse.ai révolutionne la gestion des stocks et des commandes fournisseurs : assistés par l’intelligence artificielle, vos points de vente gagnent jusqu’à 5 points de marge sur le coût matière. Vous pilotez les performances de votre réseau en temps réel pour agir vite.",
+    "Yokitup": "La solution complète pour gérer les stocks et les commandes fournisseurs de tous vos restaurants.",
+    "Koust": "Nous sommes Koust. Nous aidons les restaurateurs à se concentrer sur les actions qui leurs permettent d’améliorer leurs profits. Koust est un outil de contrôle de gestion conçu par un restaurateur pour les restaurateurs",
+    "Evoliz": "LOGICIEL DE FACTURATION ET PRÉ COMPTABILITÉ. Facturez en toute légalité, contrôlez vos dépenses, maîtrisez vos mouvements bancaires… Faîtes encore plus que ça, au même endroit.",
+    "My Unisoft": "MyUnisoft est la solution de compta augmentée pour les cabinets de demain. Un outil comptable complet pour gérer tous les dossiers",
+    "Inqom": "Logiciel moderne de production comptable et fiscale pensé pour la productivité, la qualité et la sécurité",
+    "CEGID": "Automatisez le transfert de vos données financières vers Cegid. Cette intégration synchronise vos transactions pour une tenue comptable en temps réel, garantissant une collaboration fluide avec votre expert-comptable et une conformité fiscale totale.",
+    "Bleez": "Bleez révolutionne la gestion comptable pour les entrepreneurs, les assos et les experts-comptables. Un logiciel en ligne, intuitif et collaboratif, qui vous fait gagner du temps et vous redonne la main sur ce qui compte vraiment.",
+    "ISA COMPTA": "Gagnez en autonomie, en visibilité et en sérénité grâce à un logiciel 100% conçu pour les TPE-PME. Conforme, simple, et connecté à la réalité terrain.",
+    "Dext": "Dext est une Plateforme Agréée certifiée par l'État qui aide les cabinets d'expertise comptable et les entreprises à simplifier la comptabilité et la facturation électronique grâce à l'IA. Gagnez du temps au quotidien avec nos outils pour gérer facilement vos documents administratifs, automatiser les tâches comptables répétitives et rester en conformité avec la réforme.",
+    "iPaidThat": "Gérez facilement votre facturation, vos notes de frais, vos paiements et votre trésorerie depuis une seule plateforme. iPaidThat inclus une Plateforme Agréée par la DGFiP garantissant votre conformité sur la facturation électronique.",
+    "Billiv": "Billiv propose une solution éco-responsable de dématérialisation de tickets de caisse via QR code, sans inscription ni téléchargement requis, transformant le ticket en un puissant outil marketing qui augmente l’embasement client, multiplie le nombre d’avis clients et la portée des communications par rapport au ticket par email.",
+    "Otami": "Otami est le partenaire rentabilité des professionnels de la boulangerie, pâtisserie et restauration. La solution permet de mieux piloter ses achats, ses coûts matières, ses marges et sa production, simplement et au quotidien. À la clé : jusqu’à 200 heures gagnées par an, jusqu’à 5 points de marge supplémentaires et des décisions plus rapides grâce à des données fiables. Plus de 4 000 professionnels font déjà confiance à Otami pour gagner en sérénité et en temps.",
+    "Skello": "Intégrez Skello à votre gestion d’équipe pour optimiser vos plannings et améliorer la communication interne. Simplifiez vos tâches RH et offrez à vos employés un accès en temps réel à leurs informations.",
+    "Dvore": "Centralisez et analysez vos données en temps réel. Optimisez vos opérations grâce à des tableaux de bord personnalisés et simplifiez la gestion des performances de votre restaurant avec une intégration rapide et sécurisée.",
+    "N8N": "Construisez visuellement, allez plus loin avec le code, connectez-vous à tout. Chaque étape du raisonnement de vos agents est traçable sur le canevas. Déployez sur votre infrastructure ou la nôtre.",
+    "Foodforecast": "foodforecast est une solution d'IA prédictive spécialisée pour les produits frais. Notre technologie anticipe les ventes de chaque produit, jour par jour et heure par heure, afin d'aider les boulangeries et restaurateurs à produire au plus juste et commander la bonne quantité auprès de leurs fournisseurs. Grâce à l'intégration foodforecast × Popina, les données de ventes Popina alimentent en temps réel notre IA, qui te renvoie chaque jour des prévisions précises et des recommandations de commande directement exploitables. Résultats moyens chez nos clients européens : -34 % d'invendus, -90 % de ruptures, +11 % de chiffre d'affaires. Déjà déployée dans plus de 6 000 points de vente.",
+    "Orkelo": "Orkelo est le copilote intelligent des restaurateurs, experts-comptables et copilotes d’entreprise. Il centralise les ventes, les achats, les marges, les plannings et le pointage. Grâce à l’IA, son copilote analyse les performances, détecte les hausses de prix et les pertes de rentabilité, puis propose des actions concrètes. Orkelo prédit également les ventes de chaque journée afin de mieux anticiper les achats, la production et les besoins en personnel. Résultat : moins de ressaisie, d’erreurs, de gaspillage et de dépenses invisibles, plus de temps gagné et des décisions rapides pour améliorer durablement la rentabilité du restaurant.",
+    "LittleBill": "Boostez la rétention de vos clients avec LittleBill, la solution de fidélité digitale sans friction. Grâce à sa technologie NFC, captez les données de vos clients en un instant, automatisez vos campagnes SMS et dématérialisez vos tickets de caisse. Un outil tout-en-un pour transformer vos clients de passage en habitués fidèles et améliorer votre visibilité Google.",
+    "Hey Pongo": "Captez, activez, fidélisez. Parce que tous vos visiteurs devraient vous rapporter du chiffre d’affaires.",
+    "Qoodos": "Qoodos est une solution de fidélisation pour commerces de proximité et restaurants, offrant un programme de fidélité digital qui permet aux entreprises de récompenser leurs clients pour leurs achats.",
+    "Ticat": "TICAT propose un ticket intelligent pour redonner de la valeur aux données d’achat et réinventer la relation entre commerçants et consommateurs, notamment autour de la fidélité et de l’expérience client.",
+    "Fidelatoo": "🛍️ Commerçants, boostez vos visites ici ! Vos clients vont devenir accros 🔥 Votre programme de fidélité 100% digital dans leur iPhone/Android.",
+    "Accès développeur": "Créez vos propres intégrations et connectez vos outils internes grâce à des clés API indépendantes de toute application tierce."
   };
-  var INTEGRATIONS_ACTIVES_DEFAUT = ["Click & Collect", "ComptaLink", "Ticket Digital"];
+  var INTEGRATIONS_ACTIVES_DEFAUT = ["Popina Order"];
   function integrationsActives() { return S.lire("integrations-actives", INTEGRATIONS_ACTIVES_DEFAUT); }
   function getIntegrationList() {
     var act = integrationsActives();

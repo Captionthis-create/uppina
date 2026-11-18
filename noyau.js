@@ -718,7 +718,7 @@
     },
     integrations: {
       titre: "Intégrations", sansIcones: true, items: [
-        "Sélection", "Gestion des stocks", "Comptabilité", "E-Ticket", "Business intelligence", "Commandes en ligne", "Solutions de Fidélité", "Ressources humaines", "Développeur"
+        "Sélection", "Gestion des stocks", "Comptabilité", "E-Ticket", "Business Intelligence", "Commandes en ligne", "Solutions de Fidélité", "Ressources humaines", "Développeur"
       ].map(function (n) { return { label: n, route: "/integrations", ancre: n }; })
     }
   };
