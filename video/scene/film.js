@@ -12,7 +12,7 @@
   function S(id) { for (var i = 0; i < TL.scenes.length; i++) if (TL.scenes[i].id === id) return TL.scenes[i]; throw new Error("Séquence inconnue : " + id); }
   // Instant approximatif où un mot est prononcé dans une phrase (au prorata des caractères)
   function motA(id, mot) {
-    var b = B(id), i = b.texte.toLowerCase().indexOf(mot.toLowerCase());
+    var b = B(id), i = b.texte.replace(/\u00a0/g, " ").toLowerCase().indexOf(mot.toLowerCase());
     if (i < 0) throw new Error("Mot « " + mot + " » absent de " + id);
     return b.debut + ((b.finVoix || b.fin) - b.debut) * (i / b.texte.length);
   }

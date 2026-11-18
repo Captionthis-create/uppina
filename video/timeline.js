@@ -32,10 +32,12 @@ const APRES = {
 };
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
-// Typographie française : espaces insécables avant « : ; ? ! % € » et dans « 8 h 05 », « 4 976 € »
+// Typographie française : espaces insécables avant « : ; ? ! % € » et dans « 8 h 05 », « 4 976 € » ;
+// les sous-titres ne coupent pas non plus « chiffre d'affaires » ni « top 10 »
 function typo(txt) {
   return txt.replace(/ ([:;?!%€»])/g, "\u00a0$1").replace(/(«) /g, "$1\u00a0")
-    .replace(/(\d) h (\d)/g, "$1\u00a0h\u00a0$2").replace(/(\d) (\d{3})/g, "$1\u00a0$2");
+    .replace(/(\d) h (\d)/g, "$1\u00a0h\u00a0$2").replace(/(\d) (\d{3})/g, "$1\u00a0$2")
+    .replace(/(chiffres?) (d'affaires)/gi, "$1\u00a0$2").replace(/(top) (\d)/gi, "$1\u00a0$2");
 }
 let t = AMORCE;
 const scenes = [], beats = {}, ordre = [];
