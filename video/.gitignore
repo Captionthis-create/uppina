@@ -5,3 +5,4 @@ voix/
 # Dépendances (npm install) ; sans barre finale pour ignorer aussi un lien symbolique
 node_modules
 .venv/
+__pycache__/
