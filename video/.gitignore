@@ -1,0 +1,7 @@
+# Fichiers produits (captures, voix, images, vidéo) : tout se régénère avec ./fabriquer.sh
+build/
+# Modèle de voix Piper (téléchargé par voix.py)
+voix/
+# Dépendances (npm install) ; sans barre finale pour ignorer aussi un lien symbolique
+node_modules
+.venv/

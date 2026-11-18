@@ -1,0 +1,15 @@
+{
+  "name": "uppina-video-accueil",
+  "private": true,
+  "description": "Vidéo de présentation de l'accueil Up'Pina (motion design généré depuis la démo).",
+  "scripts": {
+    "captures": "node captures.js",
+    "timeline": "node timeline.js",
+    "apercu": "node rendu.js apercu",
+    "rendu": "node rendu.js video --travailleurs 4"
+  },
+  "dependencies": {
+    "@fontsource/poppins": "5.1.0",
+    "playwright": "1.63.0"
+  }
+}
