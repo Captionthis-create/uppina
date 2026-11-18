@@ -20,14 +20,17 @@ Une journée de service, le samedi 21 novembre, racontée à la troisième perso
 | Fin | Mosaïque des fonctionnalités, logo, mention « données simulées » |
 
 Le texte de la voix off et des sous-titres est dans [`scenario.json`](scenario.json) (`texte` = sous-titre,
-`dit` = texte prononcé, écrit phonétiquement : « Eupe-pina », « Pop hi ha »).
+`dit` = texte prononcé, écrit phonétiquement : « Eupe-pina », « Pop i a »).
+
+La voix off est **Estelle**, voix française du modèle [Pocket TTS](https://huggingface.co/kyutai/pocket-tts-without-voice-cloning)
+de Kyutai (modèle français 24 couches), sous licence **CC-BY 4.0** : l'attribution figure au générique de fin.
 
 ## Fabriquer la vidéo
 
 ```bash
 npm install
 npx playwright install chromium
-python3 -m venv .venv && .venv/bin/pip install piper-tts==1.8.0 numpy scipy
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 PYTHON=.venv/bin/python ./fabriquer.sh
 ```
 
@@ -44,9 +47,13 @@ Résultat : `build/uppina-accueil.mp4` et `build/uppina-accueil.srt`. Le dossier
    l'horloge simulée avance par pas fixes : on retrouve exactement les mêmes encaissements à chaque lancement
    (dont la vente de 12h44 qui fait passer le Cidre doux 75cl de 3 à 2). Les appels météo sont coupés : la démo
    affiche sa météo simulée.
-2. `python voix.py` : voix off avec [Piper](https://github.com/rhasspy/piper) (modèle `fr_FR-upmc-medium`,
-   locuteur « Pierre », débit −5 %), une phrase par fichier. Le modèle est téléchargé dans `voix/` s'il manque.
+2. `python voix.py` : voix off avec Pocket TTS (voix « Estelle »), une phrase par fichier, sur le processeur
+   (environ le temps réel). Chaque phrase est **contrôlée automatiquement** : Whisper (`large-v3-turbo`) la retranscrit,
+   et si l'écart avec le texte est trop grand ou si le débit est anormal, elle est régénérée avec une autre graine
+   (6 essais au plus, le meilleur est gardé). Les transcriptions sont dans `build/voix/controle.json`.
 3. `node timeline.js` : place chaque phrase dans le temps et écrit le minutage et les sous-titres `.srt`.
+   [`durees-ecran.json`](durees-ecran.json) fixe la durée d'écran minimale de chaque phrase (celle du montage validé) :
+   une voix plus rapide garde le même montage, avec un peu plus de respiration.
 4. `python musique.py` : nappe musicale générée (ré majeur, 92 BPM), plus présente au coup de feu de midi.
 5. `node rendu.js video` : rend la scène animée [`scene/`](scene/) image par image (Chromium) et l'encode en H.264.
    `node rendu.js apercu 12.5 47` produit des images isolées dans `build/apercu/` pour vérifier le montage.

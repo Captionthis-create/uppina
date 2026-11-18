@@ -1,0 +1,6 @@
+# Environnement Python de la vidéo (voix, contrôle, musique, mixage) — voir README.md
+pocket-tts==4.0.1
+faster-whisper==1.2.1
+soundfile>=0.12
+scipy>=1.11
+numpy>=2

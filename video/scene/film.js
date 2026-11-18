@@ -53,7 +53,7 @@
     var ids = TL.ordre;
     for (var i = 0; i < ids.length; i++) {
       var b = TL.beats[ids[i]], suiv = ids[i + 1] ? TL.beats[ids[i + 1]].debut : TL.duree;
-      var fin = Math.min(b.fin + 0.35, suiv - 0.06);
+      var fin = Math.min((b.finVoix || b.fin) + 0.6, suiv - 0.06);
       if (t >= b.debut - 0.08 && t <= fin) {
         var o = present(t, b.debut - 0.08, fin, 0.12, 0.12);
         var e = M.noeud("st-" + ids[i], "div", "sous-titre", null, function (d) { d.innerHTML = "<span></span>"; });
@@ -646,7 +646,7 @@
     var oL = present(t, tLogo, TL.duree + 1, 0.8, 0.01) * (1 - p(t, TL.duree - 0.9, TL.duree - 0.15));
     logo("fin", t, tLogo, 960, 430, 1, oL);
     M.texte("fin-slogan", "De l'ouverture à la clôture, <b>tout le service au même endroit</b>.", "slogan", 0, 545 + 14 * (1 - p(t, tLogo + 0.5, tLogo + 1.2)), p(t, tLogo + 0.5, tLogo + 1.2) * (1 - p(t, TL.duree - 0.9, TL.duree - 0.15)));
-    M.texte("fin-mention", "Démonstration · Crêperie Démo, Rennes · toutes les données affichées sont simulées", "mention", 0, 985, p(t, tLogo + 0.9, tLogo + 1.6) * (1 - p(t, TL.duree - 0.9, TL.duree - 0.15)));
+    M.texte("fin-mention", "Démonstration · Crêperie Démo, Rennes · toutes les données affichées sont simulées<br>Voix de synthèse : Pocket TTS, Kyutai (CC-BY 4.0)", "mention", 0, 968, p(t, tLogo + 0.9, tLogo + 1.6) * (1 - p(t, TL.duree - 0.9, TL.duree - 0.15)));
   }
 
   // ------------------------------------------------------------------ assemblage

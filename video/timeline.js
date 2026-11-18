@@ -11,6 +11,8 @@ const ICI = __dirname;
 const sc = JSON.parse(fs.readFileSync(path.join(ICI, "scenario.json"), "utf8"));
 const durees = JSON.parse(fs.readFileSync(path.join(ICI, "build", "voix", "durees.json"), "utf8"));
 const captures = JSON.parse(fs.readFileSync(path.join(ICI, "build", "captures", "captures.json"), "utf8"));
+// Créneau minimal de chaque phrase à l'écran (montage validé) : une voix plus courte n'avance pas les animations
+const CRENEAUX = fs.existsSync(path.join(ICI, "durees-ecran.json")) ? JSON.parse(fs.readFileSync(path.join(ICI, "durees-ecran.json"), "utf8")).durees : {};
 
 const FPS = 30;
 const AMORCE = 2.4;        // animation du logo avant la première phrase
@@ -42,9 +44,11 @@ sc.scenes.forEach(function (s, i) {
     if (j > 0) t += ECART;
     const d = durees[b.id];
     if (d === undefined) throw new Error("Durée manquante pour " + b.id + " : relancer voix.py");
-    beats[b.id] = { debut: r3(t), fin: r3(t + d), scene: s.id, texte: typo(b.texte) };
+    const creneau = Math.max(d, CRENEAUX[b.id] || 0);
+    // fin = fin du créneau (repère des animations) ; finVoix = fin réelle de la phrase (sous-titres)
+    beats[b.id] = { debut: r3(t), fin: r3(t + creneau), finVoix: r3(t + d), scene: s.id, texte: typo(b.texte) };
     ordre.push(b.id);
-    t += d + (APRES[b.id] || 0);
+    t += creneau + (APRES[b.id] || 0);
   });
   scenes.push({ id: s.id, heure: s.heure, titre: s.titre, debut: r3(debutScene) });
 });
@@ -77,11 +81,11 @@ const cues = [];
 ordre.forEach(function (id, i) {
   const b = beats[id];
   const suivant = ordre[i + 1] ? beats[ordre[i + 1]].debut : duree;
-  const fin = Math.min(b.fin + 0.4, suivant - 0.05);
+  const fin = Math.min(b.finVoix + 0.6, suivant - 0.05);
   const morceaux = b.texte.length > 84 ? coupe(b.texte, 2) : [b.texte];
   let t0 = b.debut;
   morceaux.forEach(function (m, j) {
-    const t1 = j === morceaux.length - 1 ? fin : b.debut + (b.fin - b.debut) * (morceaux.slice(0, j + 1).join(" ").length / b.texte.length);
+    const t1 = j === morceaux.length - 1 ? fin : b.debut + (b.finVoix - b.debut) * (morceaux.slice(0, j + 1).join(" ").length / b.texte.length);
     const lignes = m.length > 42 ? coupe(m, 2).join("\n") : m;
     cues.push({ debut: t0, fin: t1, texte: lignes.replace(/\u00a0/g, " ") });
     t0 = t1 + 0.04;

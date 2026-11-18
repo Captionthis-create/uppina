@@ -1,49 +1,46 @@
 """
-voix.py : synthèse de la voix off (Piper, voix « Pierre » du modèle fr_FR-upmc-medium), une phrase par fichier.
+voix.py : synthèse de la voix off avec Pocket TTS (Kyutai, modèle français 24 couches, voix « Estelle »),
+une phrase par fichier, avec contrôle automatique de chaque phrase par reconnaissance vocale (Whisper).
 
-Entrée  : scenario.json (champ « dit » de chaque phrase)
-Sortie  : build/voix/<id>.wav (48 kHz mono, silences de début et de fin rognés)
-          build/voix/durees.json ({ id: durée en secondes })
-Modèle  : voix/fr_FR-upmc-medium.onnx (+ .onnx.json), téléchargé depuis Hugging Face s'il manque.
+Entrée  : scenario.json (champ « dit » de chaque phrase, voix dans « voix »)
+Sortie  : build/voix/<id>.wav (48 kHz mono, silences rognés, niveau homogène)
+          build/voix/durees.json ({ id: durée en secondes }) et build/voix/controle.json (transcriptions)
+Contrôle: chaque phrase est transcrite ; si l'écart avec le texte est trop grand ou la durée anormale,
+          elle est régénérée avec une autre graine (jusqu'à 6 essais) et le meilleur essai est gardé.
 Usage   : python voix.py            (toutes les phrases)
           python voix.py m4 n1      (seulement certaines)
+          python voix.py --strict a1  (n'accepter qu'une transcription exacte, sinon garder le meilleur des 6 essais)
+Licences: Pocket TTS et ses voix sont sous CC-BY 4.0 (Kyutai) : l'attribution figure au générique.
 """
 import json
 import os
+import re
 import subprocess
 import sys
-import urllib.request
+import unicodedata
 import wave
+from math import gcd
+
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")  # téléchargement HTTP classique (derrière certains proxys, Xet est bloqué)
 
 import numpy as np
-from piper import PiperVoice, SynthesisConfig
+import soundfile as sf
+import torch
+from scipy.signal import resample_poly
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 SORTIE = os.path.join(ICI, "build", "voix")
-MODELES = os.path.join(ICI, "voix")
-URL = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/fr/fr_FR/upmc/medium/"
+ESSAIS = 6
 
 
-def modele(nom):
-    os.makedirs(MODELES, exist_ok=True)
-    chemin = os.path.join(MODELES, nom + ".onnx")
-    for f in (nom + ".onnx", nom + ".onnx.json"):
-        p = os.path.join(MODELES, f)
-        if not os.path.exists(p):
-            print("Téléchargement de " + f)
-            urllib.request.urlretrieve(URL + f, p)
-    return chemin
-
-
-def rogner(x, taux, seuil_db=-46.0, marge=0.05):
+def rogner(x, taux, seuil_db=-45.0, marge=0.06):
     """Retire les silences de début et de fin (enveloppe RMS sur 10 ms)."""
     fen = max(1, int(taux * 0.01))
     n = len(x) // fen
     if n == 0:
         return x
     rms = np.sqrt(np.mean(x[: n * fen].reshape(n, fen) ** 2, axis=1) + 1e-12)
-    db = 20 * np.log10(rms)
-    actifs = np.where(db > seuil_db)[0]
+    actifs = np.where(20 * np.log10(rms) > seuil_db)[0]
     if len(actifs) == 0:
         return x
     debut = max(0, actifs[0] * fen - int(marge * taux))
@@ -51,44 +48,100 @@ def rogner(x, taux, seuil_db=-46.0, marge=0.05):
     return x[debut:fin]
 
 
+def niveau(x, taux, cible_db=-20.0):
+    """Ramène le niveau RMS des passages parlés à cible_db (phrases homogènes entre elles)."""
+    fen = max(1, int(taux * 0.02))
+    n = len(x) // fen
+    rms = np.sqrt(np.mean(x[: n * fen].reshape(n, fen) ** 2, axis=1) + 1e-12)
+    parle = rms[rms > 10 ** (-40 / 20)]
+    if len(parle) == 0:
+        return x
+    g = 10 ** (cible_db / 20) / np.sqrt(np.mean(parle ** 2))
+    y = x * g
+    crete = np.max(np.abs(y))
+    return y * (0.95 / crete) if crete > 0.95 else y
+
+
+def normaliser(s):
+    s = unicodedata.normalize("NFC", s.lower()).replace("’", "'")
+    s = re.sub(r"[^\w' ]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+# Mots ignorés dans le contrôle : noms propres, sigles et nombres, que Whisper écrit à sa façon (Up'Pina, 8h05, FEC…)
+IGNORES = re.compile(r"^(eupe|pina|pop|i|a|hi|ha|f|e|c|ttc|sms|\d.*|un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|"
+                     r"quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|mille|et|heures?|h|pour|euros?|€|%)$")
+
+
+def ecart(ref, hyp):
+    """Taux d'erreur sur les mots (Levenshtein), sans les mots ignorés."""
+    r = [w for w in normaliser(ref).replace("-", " ").split() if not IGNORES.match(w)]
+    h = [w for w in normaliser(hyp).replace("-", " ").split() if not IGNORES.match(w)]
+    d = list(range(len(h) + 1))
+    for i in range(1, len(r) + 1):
+        prec, d[0] = d[0], i
+        for j in range(1, len(h) + 1):
+            prec, d[j] = d[j], min(d[j] + 1, d[j - 1] + 1, prec + (r[i - 1] != h[j - 1]))
+    return d[len(h)] / max(1, len(r))
+
+
 def main():
+    from faster_whisper import WhisperModel
+    from pocket_tts import TTSModel
+    from pocket_tts.utils.utils import get_predefined_voice
+
     with open(os.path.join(ICI, "scenario.json"), encoding="utf-8") as f:
         sc = json.load(f)
     v = sc["voix"]
-    voix = PiperVoice.load(modele(v["modele"]))
-    config = SynthesisConfig(speaker_id=v["locuteur"], length_scale=v["debit"])
+    torch.set_num_threads(os.cpu_count() or 4)
+    modele = TTSModel.load_model(language=v["langue"])
+    etat = modele.get_state_for_audio_prompt(get_predefined_voice(v["langue"], v["nom"]))
+    asr = WhisperModel("large-v3-turbo", device="cpu", compute_type="int8")
+    sr = modele.sample_rate
+
     os.makedirs(SORTIE, exist_ok=True)
-    fichier_durees = os.path.join(SORTIE, "durees.json")
-    durees = json.load(open(fichier_durees)) if os.path.exists(fichier_durees) else {}
-    voulus = set(sys.argv[1:])
+    f_durees, f_controle = os.path.join(SORTIE, "durees.json"), os.path.join(SORTIE, "controle.json")
+    durees = json.load(open(f_durees)) if os.path.exists(f_durees) else {}
+    controle = json.load(open(f_controle, encoding="utf-8")) if os.path.exists(f_controle) else {}
+    strict = "--strict" in sys.argv
+    voulus = set(a for a in sys.argv[1:] if not a.startswith("--"))
     for scene in sc["scenes"]:
         for b in scene["beats"]:
             if voulus and b["id"] not in voulus:
                 continue
-            brut = os.path.join(SORTIE, b["id"] + "-brut.wav")
-            with wave.open(brut, "wb") as wf:
-                voix.synthesize_wav(b["dit"], wf, syn_config=config)
-            with wave.open(brut, "rb") as wf:
-                taux = wf.getframerate()
-                x = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
-            x = rogner(x, taux)
-            propre = os.path.join(SORTIE, b["id"] + "-22k.wav")
-            with wave.open(propre, "wb") as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(taux)
-                wf.writeframes((np.clip(x, -1, 1) * 32767).astype(np.int16).tobytes())
+            mots = len(normaliser(b["dit"]).split())
+            meilleur = None
+            for essai in range(ESSAIS):
+                torch.manual_seed(1000 * essai + sum(map(ord, b["id"])))
+                x = modele.generate_audio(etat, b["dit"], copy_state=True).squeeze().cpu().numpy().astype(np.float32)
+                x = rogner(x, sr)
+                duree = len(x) / sr
+                g = gcd(sr, 16000)
+                transcrit = " ".join(s.text for s in asr.transcribe(resample_poly(x, 16000 // g, sr // g).astype(np.float32), language="fr", beam_size=5)[0]).strip()
+                e = ecart(b["dit"], transcrit)
+                debit = mots / max(duree, 0.1)
+                # Pénalité si le débit sort de la plage naturelle (silences anormaux ou phrase avalée)
+                note = e + (0.25 if not (2.0 <= debit <= 4.2) else 0.0)
+                if meilleur is None or note < meilleur[0]:
+                    meilleur = (note, x, transcrit, e, debit, essai)
+                if note <= (0.0 if strict else 0.08):
+                    break
+            note, x, transcrit, e, debit, essai = meilleur
+            x = niveau(x, sr)
+            brut = os.path.join(SORTIE, b["id"] + "-24k.wav")
+            sf.write(brut, x, sr, subtype="PCM_16")
             final = os.path.join(SORTIE, b["id"] + ".wav")
-            # 48 kHz, coupe-bas léger (souffle grave du modèle)
-            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", propre, "-af", "highpass=f=70,aresample=48000:resampler=soxr",
-                            "-ar", "48000", "-ac", "1", final], check=True)
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", brut, "-af", "highpass=f=60,aresample=48000:resampler=soxr", "-ar", "48000", "-ac", "1", final], check=True)
             os.remove(brut)
-            os.remove(propre)
             with wave.open(final, "rb") as wf:
                 durees[b["id"]] = round(wf.getnframes() / wf.getframerate(), 3)
-            print("%-3s %5.2f s  %s" % (b["id"], durees[b["id"]], b["texte"]))
-    with open(fichier_durees, "w") as f:
-        json.dump(durees, f, indent=1)
+            controle[b["id"]] = {"texte": b["dit"], "entendu": transcrit, "ecart": round(e, 3), "debit": round(debit, 2), "essais": essai + 1}
+            alerte = "  ⚠" if e > 0.15 else ""
+            print("%-3s %5.2f s  écart %.2f  %d essai(s)%s  « %s »" % (b["id"], durees[b["id"]], e, essai + 1, alerte, transcrit), flush=True)
+            with open(f_durees, "w") as f:
+                json.dump(durees, f, indent=1)
+            with open(f_controle, "w", encoding="utf-8") as f:
+                json.dump(controle, f, indent=1, ensure_ascii=False)
     print("Total voix : %.1f s" % sum(durees.values()))
 
 

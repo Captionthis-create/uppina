@@ -1,12 +1,12 @@
 {
   "titre": "Une journée avec Up'Pina",
   "voix": {
-    "modele": "fr_FR-upmc-medium",
-    "locuteur": 1,
-    "nom": "Pierre",
-    "debit": 1.05
+    "moteur": "Pocket TTS (Kyutai)",
+    "langue": "french_24l",
+    "nom": "estelle",
+    "licence": "CC-BY 4.0"
   },
-  "note": "texte = sous-titre affiché ; dit = texte envoyé à la synthèse vocale (orthographe phonétique : Eupe-pina, Pop hi ha, F.E.C).",
+  "note": "texte = sous-titre affiché ; dit = texte envoyé à la synthèse vocale (orthographe phonétique : Eupe-pina, Pop i a, F E C).",
   "scenes": [
     {
       "id": "intro",
@@ -186,7 +186,7 @@
         {
           "id": "n2",
           "texte": "Pour analyser sa journée, il interroge Pop'IA, l'assistant intégré, en français.",
-          "dit": "Pour analyser sa journée, il interroge Pop hi ha, l'assistant intégré, en français."
+          "dit": "Pour analyser sa journée, il interroge Pop i a, l'assistant intégré, en français."
         },
         {
           "id": "n3",
@@ -211,7 +211,7 @@
         {
           "id": "n7",
           "texte": "Enfin, l'export comptable prépare les écritures du mois au format FEC, prêtes pour le cabinet comptable.",
-          "dit": "Enfin, l'export comptable prépare les écritures du mois au format F.E.C, prêtes pour le cabinet comptable."
+          "dit": "Enfin, l'export comptable prépare les écritures du mois au format F E C, prêtes pour le cabinet comptable."
         }
       ]
     },
