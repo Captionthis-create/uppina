@@ -49,7 +49,7 @@
     ["salle", "/point-of-sale/rooms", "les salles"],
     ["imprimante", "/point-of-sale/settings/printers", "les imprimantes"]
   ];
-  var MOTS_VIDES = ["plat", "plats", "boisson", "boissons", "article", "articles", "produit", "produits", "vendu", "vendus", "vendue", "vendues", "semaine", "mois", "jour", "jours", "derniers", "dernier", "combien", "hier", "ventes", "vente", "quantite", "nombre", "pour", "dans", "avec", "tous", "toutes", "cette", "meilleurs", "meilleur", "moins", "plus", "carte", "mois-ci", "top"];
+  var MOTS_VIDES = ["plat", "plats", "boisson", "boissons", "article", "articles", "produit", "produits", "vendu", "vendus", "vendue", "vendues", "semaine", "mois", "jour", "jours", "derniers", "dernier", "combien", "hier", "ventes", "vente", "quantite", "nombre", "pour", "dans", "avec", "tous", "toutes", "cette", "meilleurs", "meilleur", "moins", "plus", "carte", "mois-ci", "top", "samedi", "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "soir", "soiree", "matin", "midi", "semaines", "annee", "derniere", "dernieres", "passe", "passee"];
 
   var reponses = [];        // réponses déjà affichées (pour les boutons CSV / ouvrir)
   var dernier = null;       // { intention, q } : sert aux questions de suite (« et le mois dernier ? »)
@@ -270,19 +270,33 @@
       q.texte.replace(/[^a-z0-9' -]/g, " ").split(/[\s']+/).forEach(function (w) {
         if (w.length >= 4 && MOTS_VIDES.indexOf(w) < 0 && !/^\d+$/.test(w)) jetons.push(w.replace(/s$/, ""));
       });
+      // Famille : un jeton qui désigne une catégorie ou sous-catégorie (« galettes », « cidres », « crêpes »...)
+      var famille = jetons.filter(function (w) {
+        return r.products.some(function (p) { return norm(p.category || "").indexOf(w) >= 0 || norm(p.subCategory || "").indexOf(w) >= 0; });
+      });
+      // Produit précis : un jeton hors famille figure dans un nom (« galette saucisse », « cidre brut »)
+      var precis = jetons.some(function (w) { return famille.indexOf(w) < 0 && r.products.some(function (p) { return norm(p.name).indexOf(w) >= 0; }); });
+      var estFamille = famille.length > 0 && !precis, nomFamille = "";
       var cible = liste.filter(function (p) {
         var nom = norm(p.name);
+        if (estFamille) return famille.every(function (w) { return nom.indexOf(w) >= 0 || norm(p.category || "").indexOf(w) >= 0 || norm(p.subCategory || "").indexOf(w) >= 0; });
         return jetons.some(function (w) { return nom.indexOf(w) >= 0; });
       });
-      if (cible.length) { liste = cible; filtre = jetons.filter(function (w) { return cible.some(function (p) { return norm(p.name).indexOf(w) >= 0; }); }).join(", "); }
+      if (estFamille && cible.length) {
+        var cats = {}; cible.forEach(function (p) { cats[p.category] = 1; });
+        nomFamille = Object.keys(cats).length === 1 ? Object.keys(cats)[0] : famille.join(", ");
+        liste = cible; filtre = nomFamille;
+      } else if (cible.length) { liste = cible; filtre = jetons.filter(function (w) { return cible.some(function (p) { return norm(p.name).indexOf(w) >= 0; }); }).join(", "); }
       else if (strict) return null;
       var cle = q.quantite ? "productQuantity" : "productSales";
       liste.sort(function (a, b) { return q.asc ? a[cle] - b[cle] : b[cle] - a[cle]; });
-      liste = liste.slice(0, q.n);
+      var totQ = somme(liste.map(function (p) { return p.productQuantity; })), totV = somme(liste.map(function (p) { return p.productSales; }));
+      if (!nomFamille || q.nExplicite) liste = liste.slice(0, q.n);
       var rep = reponseListe(q, {
         intro: (filtre ? "Ventes de « " + filtre + " »" : (q.asc ? "Produits les moins vendus" : "Top " + liste.length + " des produits")) + (q.quantite ? " en quantité" : ""),
         labels: liste.map(function (p) { return p.name; }), valeurs: liste.map(function (p) { return p[cle]; }),
-        unite: q.quantite ? "u" : "€", typeDefaut: "hbarres", colonne: "Produit", csv: "produits", rapport: "produits"
+        unite: q.quantite ? "u" : "€", typeDefaut: "hbarres", colonne: "Produit", csv: "produits", rapport: "produits",
+        phrase: nomFamille ? function () { return nomFamille + " : " + App.entier(totQ) + " vendus, " + App.euro(totV) + ". Détail par produit ci-dessous."; } : null
       });
       return rep;
     });

@@ -779,7 +779,7 @@
     l.forEach(function (x) {
       var c = cats[x.prod.categorie] = cats[x.prod.categorie] || { category: x.prod.categorie, productSales: 0, productQuantity: 0 };
       c.productSales += x.ttc; c.productQuantity += x.q;
-      var q = prods[x.prod.nom] = prods[x.prod.nom] || { name: x.prod.nom, productSales: 0, productQuantity: 0 };
+      var q = prods[x.prod.nom] = prods[x.prod.nom] || { name: x.prod.nom, category: x.prod.categorie, subCategory: x.prod.sousCategorie, productSales: 0, productQuantity: 0 };
       q.productSales += x.ttc; q.productQuantity += x.q;
     });
     function tri(o) { return Object.keys(o).map(function (k) { o[k].productSales = arrondi(o[k].productSales); return o[k]; }).sort(function (a, b) { return b.productSales - a.productSales; }); }
