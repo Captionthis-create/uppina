@@ -30,9 +30,11 @@
         var ventes = res[0], pc = res[1], emp = res[2], comp = res[3];
         var meteoHtml = meteo ? A.meteo.carte(P(ctx), res[4].jours, res[5] ? res[5].jours : null, nomComp) + res[6] : "";
         var mode = et.mode || "ttc", vue = et.vue || "courbe", auj = A.aujourdhui();
-        var jours = ventes.reportFromPeriod;
+        var jours = ventes.reportFromPeriod, enCours = D.maintenantMin() < D.HEURE_FERMETURE + 15;
+        // La journée en cours n'est pas finie : on ne la trace pas (sinon la courbe « plonge »), elle est rappelée sous le graphique
+        var jourEnCours = enCours ? jours.filter(function (j) { return j.date === auj; })[0] : null;
         function serie(liste, futur) {
-          return liste.map(function (j) { return futur && j.date > auj ? null : (mode === "ttc" ? j.totalSales : j.totalSalesWithoutTaxes); });
+          return liste.map(function (j) { return futur && (j.date > auj || (jourEnCours && j.date === auj)) ? null : (mode === "ttc" ? j.totalSales : j.totalSalesWithoutTaxes); });
         }
         var labels = jours.map(function (j) { return ctx.tranche ? j.date.slice(8) + "/" + j.date.slice(5, 7) : +j.date.slice(8); });
         // Tranche active : moyennes par jour retenu (« par lundi »), plus un avertissement quand l'échantillon est mince
@@ -44,7 +46,7 @@
             ["CA TTC moyen / " + unite, ouv ? A.euro(ventes.totalSales / ouv) : "-"],
             ["Couverts moyens / " + unite, ouv ? A.decimal(ventes.guestsNumber / ouv) : "-"],
             ["Commandes moy. / " + unite, ouv ? A.decimal(ventes.orderCount / ouv) : "-"]
-          ]) + (ouv < 5 ? '<div class="bandeau-factice">Seulement ' + A.entier(ouv) + " " + (nomJour || "jour(s)") + " avec ventes : la moyenne est peu représentative. Élargissez la période.</div>" : "");
+          ]) + (ouv < 5 ? '<div class="bandeau-avert">Seulement ' + A.entier(ouv) + " " + (nomJour || "jour(s)") + " avec ventes : la moyenne est peu représentative. Élargissez la période.</div>" : "");
         }
         var series = [{ nom: A.libellePeriode(ctx.periode), couleur: "#111", valeurs: serie(jours, true) }];
         if (comp) series.push({ nom: nomComp, couleur: "#999", tirets: true, valeurs: serie(comp.reportFromPeriod.slice(0, jours.length), false) });
@@ -54,7 +56,8 @@
           A.segment("dash-vue", [["courbe", "∼"], ["barres", "▮▮"]], vue, function (v) { et.vue = v; ctx.rafraichir(); });
         function top(titre, entetes, rangees) { return A.carte(titre, A.table(entetes, rangees, null, { classe: "zebre" })); }
         zone.innerHTML = A.kpis([["Nombre de couverts", A.entier(ventes.guestsNumber)], ["Couverts moyen", A.euro(ventes.averageGuest)], ["Total TTC", A.euro(ventes.totalSales)], ["Total HT", A.euro(ventes.totalSalesWithoutTaxes)]]) + htmlTranche +
-          A.carte("Total des ventes", graphe + '<div class="legende"><span><i class="trait" style="background:#111"></i>' + E(A.libellePeriode(ctx.periode)) + '</span>' + (comp ? '<span><i class="trait" style="background:#999"></i>' + E(nomComp) + "</span>" : "") + '<span class="chip">' + ventes.closedTillsCount + " caisses clôturées</span></div>", { droite: droite }) + meteoHtml +
+          A.carte("Total des ventes", graphe + '<div class="legende"><span><i class="trait" style="background:#111"></i>' + E(A.libellePeriode(ctx.periode)) + '</span>' + (comp ? '<span><i class="trait" style="background:#999"></i>' + E(nomComp) + "</span>" : "") + '<span class="chip">' + ventes.closedTillsCount + " caisses clôturées</span>" +
+          (jourEnCours ? '<span class="chip"><span class="point-direct"></span>Aujourd\'hui en cours : ' + A.euro(mode === "ttc" ? jourEnCours.totalSales : jourEnCours.totalSalesWithoutTaxes) + "</span>" : "") + "</div>", { droite: droite }) + meteoHtml +
           '<div class="deux-col">' +
           top("Top produits", [{ t: "Produit" }, d("Quantité"), d("Total")], pc.products.slice(0, 5).map(function (p) { return [E(p.name), A.entier(p.productQuantity), A.euro(p.productSales)]; })) +
           top("Top catégories", [{ t: "Catégorie" }, d("Quantité"), d("Total")], pc.categories.slice(0, 5).map(function (p) { return [E(p.category), A.entier(p.productQuantity), A.euro(p.productSales)]; })) + "</div>" +
@@ -147,24 +150,43 @@
       });
     }
   });
-  // ---------- Caisses en cours ----------
+  // ---------- Caisses en cours (en direct) ----------
   A.ecran("/reports/tills-in-progress", {
     section: "rapports", fil: ["Caisses en cours"],
     rendre: function (ctx, zone) {
-      D.getRealTime().then(function () {
-        var jour = A.majuscule(["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"][new Date().getDay()]);
-        var pastille = '<span class="pastille-info"><i></i>Aucune donnée disponible</span>';
-        var graphe = A.graph.courbe({ labels: [], series: [], hauteur: 220, vide: true });
-        zone.innerHTML = A.kpis([["Total TTC", A.euro(0)], ["Couverts moyen", A.euro(0)], ["Nb. de couverts", "0"], ["Total des annulations", A.euro(0)]]) +
-          A.carte("Chiffre d'affaires par heure " + pastille, graphe + '<div class="legende mono"><span><i style="background:#8e44ad"></i>' + E(A.siteNom) + '</span><span><i style="background:#999"></i>' + jour.toLowerCase() + " dernier</span></div>") +
-          A.carte("Chiffre d'affaires en cours " + pastille, graphe);
+      Promise.all([D.getRealTime(), D.getDerniersEncaissements(8)]).then(function (res) {
+        var r = res[0], rt = r.realTimeData, jourNom = A.majuscule(new Date(r.lastWeekData.date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long" }));
+        var etat = r.avantOuverture ? '<span class="pastille-info"><i></i>La caisse ouvre vers 7h45</span>' :
+          r.enCours ? '<span class="pastille-direct"><i></i>En direct</span>' : '<span class="pastille-info"><i></i>Caisse clôturée à ' + r.fermeeA + "</span>";
+        var heures = rt.totalByHours.map(function (h) { return h.hour + "h"; }), maintenantH = +r.maintenant.slice(0, 2);
+        var auj = rt.totalByHours.map(function (h) { return r.enCours && h.hour > maintenantH ? null : h.total; });
+        var sem = r.lastWeekData.totalByHours.map(function (h) { return h.total; });
+        function cumul(l) { var c = 0; return l.map(function (v) { if (v === null) return null; c += v; return Math.round(c * 100) / 100; }); }
+        var ecart = r.lastWeekData.memeHeure ? Math.round((rt.totalSales - r.lastWeekData.memeHeure) / r.lastWeekData.memeHeure * 100) : null;
+        var legende = '<div class="legende"><span><i class="trait" style="background:#8e44ad"></i>' + E(A.siteNom) + " · aujourd'hui</span><span><i class=\"trait\" style=\"background:#999\"></i>" + E(jourNom.toLowerCase()) + " dernier</span></div>";
+        var nouveaux = ctx.etat.nouveaux || []; ctx.etat.nouveaux = [];
+        var fil = res[1].length ? '<div class="fil-direct">' + res[1].map(function (c) {
+          return '<a class="fd-ligne' + (nouveaux.indexOf(c.id) >= 0 ? " nouveau" : "") + '" href="#/orders?cmd=' + encodeURIComponent(c.id) + '"><span class="fd-heure">' + E(c.heure) + '</span><span class="fd-quoi"><b>' + E(c.salle === "À emporter" ? (c.enLigne ? "À emporter · en ligne" : "À emporter") : c.salle + " · " + c.table) +
+            '</b><span class="doux petit">' + E(c.resume) + '</span></span><span class="doux petit">' + E(c.paiement) + '</span><b class="fd-montant">' + A.euro(c.total) + "</b></a>";
+        }).join("") + "</div>" : A.vide("Pas encore d'encaissement");
+        var salles = r.parSalle.length ? r.parSalle.map(function (x) {
+          var max = r.parSalle[0].total || 1;
+          return '<div class="hbarre"><div class="hbarre-nom">' + E(x.salle) + '</div><div class="hbarre-ligne"><i style="width:' + Math.max(2, x.total / max * 88) + '%;background:#8e44ad"></i><b>' + A.euro(x.total) + "</b></div></div>";
+        }).join("") : '<p class="doux centre">Aucune vente pour l\'instant.</p>';
+        zone.innerHTML = '<div class="bandeau-caisse carte"><div><b>Caisse n°' + r.numero + "</b> · " + E(A.siteNom) + '<div class="doux petit">' + (r.avantOuverture ? "Ouverture prévue à 7h45" : "Ouverte à " + r.ouverteA + (r.fermeeA ? " · clôturée à " + r.fermeeA : " · mise à jour à " + r.maintenant)) + "</div></div>" + etat + "</div>" +
+          A.kpis([["Total TTC", A.euro(rt.totalSales)], ["Couverts moyen", A.euro(rt.guestsNumber ? rt.totalSales / rt.guestsNumber : 0)], ["Nb. de couverts", A.entier(rt.guestsNumber)], ["Total des annulations", A.euro(rt.totalCanceled)]]) +
+          A.kpis([["Commandes", A.entier(rt.orderCount)], ["Pourboires", A.euro(rt.totalTips)], ["vs " + jourNom.toLowerCase() + " dernier, même heure", ecart === null ? "–" : '<span class="' + (ecart >= 0 ? "delta-bon" : "delta-mauvais") + '">' + (ecart >= 0 ? "▲ +" : "▼ ") + String(ecart).replace("-", "−") + " %</span>"]]) +
+          A.carte("Chiffre d'affaires par heure " + etat, A.graph.courbe({ labels: heures, series: [{ nom: "Aujourd'hui", couleur: "#8e44ad", valeurs: auj }, { nom: "Semaine dernière", couleur: "#999", tirets: true, valeurs: sem }], hauteur: 220 }) + legende) +
+          A.carte("Chiffre d'affaires cumulé " + etat, A.graph.courbe({ labels: heures, series: [{ nom: "Aujourd'hui", couleur: "#8e44ad", valeurs: cumul(auj) }, { nom: "Semaine dernière", couleur: "#999", tirets: true, valeurs: cumul(sem) }], hauteur: 220, lisse: false }) + legende) +
+          '<div class="deux-col">' + A.carte("Derniers encaissements", fil, { droite: '<a class="lien-bloc" href="#/orders">Commandes ›</a>' }) + A.carte("Ventes par salle", '<div class="pad-h">' + salles + "</div>") + "</div>";
+        setTimeout(function () { Array.prototype.forEach.call(zone.querySelectorAll(".fd-ligne.nouveau"), function (x) { x.classList.add("fini"); }); }, 2500);
       });
     }
   });
 
   // ---------- Stocks : tiroir d'édition (ajout / inventaire / perte), données factices ----------
   var TYPES_STOCK = [["ajout", "Ajouter"], ["inventaire", "Inventaire"], ["perte", "Perte"]];
-  var LIB_MVT = { ajout: "Ajout", inventaire: "Inventaire", perte: "Perte" };
+  var LIB_MVT = { ajout: "Ajout", inventaire: "Inventaire", perte: "Perte", vente: "Ventes" };
   function dateHeure(iso) {
     var x = new Date(iso);
     function z(n) { return (n < 10 ? "0" : "") + n; }
@@ -181,7 +203,6 @@
         : "Quantité perdue, retirée du stock.";
       t.innerHTML = '<div class="tiroir-tete"><div><h3>' + E(l.productName) + '</h3><span class="doux">' + E(l.category) + " › " + E(l.subCategory) + " · stock actuel : <b>" + E(l.quantity) + '</b></span></div><button class="fermer" data-fermer>✕</button></div>' +
         '<div class="tiroir-corps">' +
-        '<div class="bandeau-factice">Données factices : non fournies par l\'API.</div>' +
         '<div class="segment stk-type">' + TYPES_STOCK.map(function (c) { return '<button class="' + (c[0] === type ? "actif" : "") + '" data-type="' + c[0] + '">' + c[1] + "</button>"; }).join("") + "</div>" +
         '<div class="stk-form"><label>' + (type === "inventaire" ? "Quantité comptée" : "Quantité") + '<input id="stk-q" type="number" min="0" step="any" inputmode="decimal"></label><p class="doux">' + aide + "</p>" +
         (type === "perte" ? '<label>Motif de la perte<select id="stk-motif"><option value="">Choisir un motif…</option>' + D.MOTIFS_PERTE.map(function (m) { return '<option value="' + E(m) + '">' + E(m) + "</option>"; }).join("") + "</select></label>" : "") +
@@ -232,34 +253,41 @@
         lignes.forEach(function (l) { cats[l.category] = 1; if (!et.cat || et.cat === l.category) sous[l.subCategory] = 1; });
         var vue = lignes.filter(function (l) {
           return (!et.cat || l.category === et.cat) && (!et.sous || l.subCategory === et.sous) &&
-            (et.min === undefined || et.min === "" || l.quantity >= +et.min) && (et.max === undefined || et.max === "" || l.quantity <= +et.max);
+            (et.min === undefined || et.min === "" || l.quantity >= +et.min) && (et.max === undefined || et.max === "" || l.quantity <= +et.max) &&
+            (!et.du || (l.lastDeclaredAt && l.lastDeclaredAt >= et.du)) && (!et.au || (l.lastDeclaredAt && l.lastDeclaredAt <= et.au)) &&
+            (!et.alerte || (l.seuil !== null && l.quantity <= l.seuil));
         });
         A.act.export = function () {
-          A.telechargerCsv("stocks.csv", ["Produit", "Dernière déclaration", "Catégorie", "Sous-catégorie", "Stock déclaré"],
-            vue.map(function (l) { return [l.productName, l.lastDeclaredAt || "-", l.category, l.subCategory, l.quantity]; }));
+          A.telechargerCsv("stocks.csv", ["Produit", "Dernière déclaration", "Catégorie", "Sous-catégorie", "Stock déclaré", "Seuil"],
+            vue.map(function (l) { return [l.productName, l.lastDeclaredAt || "-", l.category, l.subCategory, l.quantity, l.seuil === null ? "" : l.seuil]; }));
         };
         function relatif(iso) {
           if (!iso) return "-";
-          var j = Math.round((Date.now() - A.depuisIso(iso).getTime()) / 86400000);
-          return "il y a " + j + " jour" + (j > 1 ? "s" : "");
+          var j = Math.round((A.depuisIso(A.aujourdhui()).getTime() - A.depuisIso(iso).getTime()) / 86400000);
+          return j <= 0 ? "aujourd'hui" : j === 1 ? "hier" : "il y a " + j + " jours";
         }
-        var filtres = '<div class="selecteur-periode inactif"><button disabled>‹</button><span class="libelle">Sélectionner une plage de dates</span><button disabled>›</button></div>' +
+        var nbAlertes = lignes.filter(function (l) { return l.seuil !== null && l.quantity <= l.seuil; }).length;
+        var libPlage = et.du || et.au ? (et.du ? A.dateCourte(et.du) : "…") + " - " + (et.au ? A.dateCourte(et.au) : "…") : "Sélectionner une plage de dates";
+        var filtres = '<div class="menu-conteneur"><button class="bouton' + (et.du || et.au ? " bouton-tranche" : "") + '" data-ouvre="stk-plage" title="Filtrer sur la date de la dernière déclaration">📅 ' + E(libPlage) + A.icones.basPetit + "</button>" +
+          '<div class="menu-flottant" id="menu-stk-plage"><div class="plage"><span>Dernière déclaration</span><label>Du<br><input type="date" id="stk-du" value="' + E(et.du || "") + '"></label><label>Au<br><input type="date" id="stk-au" value="' + E(et.au || "") + '"></label>' +
+          '<button class="bouton sombre" id="stk-plage-ok">Appliquer</button><button class="bouton" id="stk-plage-raz">Effacer</button></div></div></div>' +
           A.liste("stk-cat", "Catégorie", Object.keys(cats).map(function (c) { return [c, c]; }), et.cat, function (v) { et.cat = v; et.sous = ""; ctx.rafraichir(); }) +
-          A.liste("stk-sous", "Sous-catégorie", Object.keys(sous).map(function (c) { return [c, c]; }), et.sous, function (v) { et.sous = v; ctx.rafraichir(); });
+          A.liste("stk-sous", "Sous-catégorie", Object.keys(sous).map(function (c) { return [c, c]; }), et.sous, function (v) { et.sous = v; ctx.rafraichir(); }) +
+          '<button class="bouton' + (et.alerte ? " bouton-tranche" : "") + '" data-act="stkAlertes">Sous le seuil (' + nbAlertes + ")</button>";
         A.act.stkEdit = function (id) {
           var l = lignes.filter(function (x) { return String(x.id) === id; })[0];
           if (l) editerStock(l, ctx);
         };
-        zone.innerHTML = '<div class="bandeau-factice"><b>Données factices.</b> Les stocks ne sont pas fournis par l\'API Popina : quantités et mouvements sont inventés et ne sont enregistrés que dans ce navigateur.</div>' +
-          A.carte("Tableau des stocks",
+        A.act.stkAlertes = function () { et.alerte = !et.alerte; ctx.rafraichir(); };
+        zone.innerHTML = A.carte("Tableau des stocks " + '<span class="badge-nouveau">Nouveau</span>',
           '<div id="td"></div><div class="barre-stock">Stock déclaré <input id="smin" placeholder="" value="' + E(et.min || "") + '"> à <input id="smax" value="' + E(et.max || "") + '"></div>', { classe: "avec-tableau" });
-        // La zone « stock déclaré » se place sous la barre d'outils
         var tdz = document.getElementById("td");
         A.monterTable(tdz, {
           colonnes: [{ t: "Produit", k: "productName" }, { t: "Dernière déclaration", f: function (r) { return relatif(r.lastDeclaredAt); }, tri: function (r) { return r.lastDeclaredAt || ""; } },
             { t: "Catégorie", f: function (r) { return '<span class="ic-nom">' + A.icones.stocks.replace("icone", "icone sombre") + E(r.category) + "</span>"; }, tri: function (r) { return r.category; } },
             { t: "Sous-catégorie", f: function (r) { return '<span class="ic-nom">' + A.icones.dossier + E(r.subCategory) + "</span>"; }, tri: function (r) { return r.subCategory; } },
-            { t: "Stock déclaré", k: "quantity", tri: function (r) { return r.quantity; } },
+            { t: "Stock déclaré", f: function (r) { var bas = r.seuil !== null && r.quantity <= r.seuil; return '<b class="' + (r.quantity === 0 ? "rouge" : bas ? "orange" : "") + '">' + A.entier(r.quantity) + "</b>" + (bas ? ' <span class="badge-bon ' + (r.quantity === 0 ? "ko" : "attention") + '">' + (r.quantity === 0 ? "Rupture" : "À commander") + "</span>" : ""); }, tri: function (r) { return r.quantity; } },
+            { t: "Seuil", a: "d", f: function (r) { return r.seuil === null ? '<span class="doux">-</span>' : A.entier(r.seuil); }, tri: function (r) { return r.seuil === null ? -1 : r.seuil; } },
             { t: "", f: function (r) { return '<button class="bouton-icone" title="Modifier le stock" data-act="stkEdit" data-val="' + E(r.id) + '">' + A.icones.crayon + "</button>"; }, tri: function () { return 0; } }],
           lignes: vue, rech: { ph: "Rechercher un produit", texte: function (r) { return r.productName; } }, sansFiltrer: true, sansColonnes: true, filtres: filtres, pageSize: 20
         });
@@ -267,6 +295,8 @@
         document.getElementById("smin").onchange = function () { et.min = this.value; ctx.rafraichir(); };
         document.getElementById("smax").onchange = function () { et.max = this.value; ctx.rafraichir(); };
         zone.querySelector(".td-barre").appendChild(bs);
+        document.getElementById("stk-plage-ok").onclick = function () { et.du = document.getElementById("stk-du").value; et.au = document.getElementById("stk-au").value; if (et.du && et.au && et.du > et.au) { var t = et.du; et.du = et.au; et.au = t; } ctx.rafraichir(); };
+        document.getElementById("stk-plage-raz").onclick = function () { et.du = ""; et.au = ""; ctx.rafraichir(); };
       });
     }
   });
@@ -284,19 +314,30 @@
           return '<div class="carte carte-top" style="--bande:' + couleur + '"><div class="carte-bande"></div><div class="carte-tete"><h2>' + titre + "</h2></div><div class=\"carte-corps\">" +
             A.table([{ t: "Produit" }, d("Quantité"), d("Total")], liste.map(function (p) { return [E(p.name), A.entier(p.quantity), '<span class="mono">' + A.euro(p.netAmount) + "</span>"]; }), null, { classe: "zebre" }) + "</div></div>";
         }
+        var et = ctx.etat, grp = et.grouper || "";
+        var lignesTable = r.items, detailTable = function (p) { return p.pricingList.map(function (x) { return ["", "", E(x.pricing), A.entier(x.quantity), A.euro(x.excludingTax), A.euro(x.sales)]; }); };
+        if (grp) {
+          var g = {};
+          r.items.forEach(function (p) {
+            var k = grp === "categorie" ? p.category : p.category + " › " + p.subCategory, x = g[k] = g[k] || { name: k, establishment: p.establishment, quantity: 0, excludingTax: 0, netAmount: 0, enfants: [] };
+            x.quantity += p.quantity; x.excludingTax += p.excludingTax; x.netAmount += p.netAmount; x.enfants.push(p);
+          });
+          lignesTable = Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return b.netAmount - a.netAmount; });
+          detailTable = function (x) { return x.enfants.map(function (p) { return [E(p.name), "", "", A.entier(p.quantity), A.euro(p.excludingTax), A.euro(p.netAmount)]; }); };
+        }
+        A.act.regrouper = function (v) { et.grouper = v; ctx.rafraichir(); };
         zone.innerHTML = '<div class="deux-col">' + top("Top produits", r.topFive, "#5fc48a") + top("Flop produits", r.flopFive, "#ee7b72") + "</div>" +
-          A.carte("Tous les produits", '<div id="td"></div>');
+          A.carte(grp ? "Produits regroupés par " + (grp === "categorie" ? "catégorie" : "sous-catégorie") : "Tous les produits", '<div id="td"></div>');
         A.monterTable(document.getElementById("td"), {
-          colonnes: [{ t: "Produits", k: "name" }, { t: "Établissement", k: "establishment" }, { t: "Type de prix", f: function () { return "-"; } },
+          colonnes: [{ t: grp ? (grp === "categorie" ? "Catégorie" : "Sous-catégorie") : "Produits", k: "name" }, { t: "Établissement", k: "establishment" }, { t: "Type de prix", f: function (p) { return p.pricingList ? p.pricingList.length + " tarif" + (p.pricingList.length > 1 ? "s" : "") : "-"; } },
             { t: "Quantité", a: "d", f: function (p) { return "<b>" + A.entier(p.quantity) + "</b>"; }, tri: function (p) { return p.quantity; } },
             { t: "Total HT", a: "d", f: function (p) { return "<b>" + A.euro(p.excludingTax) + "</b>"; }, tri: function (p) { return p.excludingTax; } },
             { t: "Total", a: "d", f: function (p) { return "<b>" + A.euro(p.netAmount) + "</b>"; }, tri: function (p) { return p.netAmount; } }],
-          lignes: r.items, rech: { ph: "Rechercher un produit", texte: function (p) { return p.name; } }, pageSize: 20,
+          lignes: lignesTable, rech: { ph: grp ? "Rechercher une catégorie" : "Rechercher un produit", texte: function (p) { return p.name; } }, pageSize: 20,
           total: ["Total", "", "", "<b>" + A.entier(r.totals.quantity) + "</b>", "<b>" + A.euro(r.totals.excludingTax) + "</b>", "<b>" + A.euro(r.totals.netAmount) + "</b>"],
-          droite: A.bouton("Regrouper par", "regrouper", { chevron: true }),
-          detail: function (p) { return p.pricingList.map(function (x) { return ["", "", E(x.pricing), A.entier(x.quantity), A.euro(x.excludingTax), A.euro(x.sales)]; }); }
+          droite: A.liste("regrouper", "Regrouper par", [["categorie", "Catégorie"], ["sous", "Sous-catégorie"]], grp, A.act.regrouper),
+          detail: detailTable
         });
-        A.act.regrouper = A.nonDispo;
       });
     }
   });
@@ -323,8 +364,8 @@
     rendre: function (ctx, zone) {
       D.getEmployees(P(ctx)).then(function (l) {
         A.act.export = function () {
-          A.telechargerCsv("employes.csv", ["Nom", "Total Ventes", "Total Encaissé", "Total Annulé", "Total Pertes", "Commandes", "Couverts"],
-            l.map(function (e) { return [e.operatorName, A.montantCsv(e.operatorTotalOrderSales), A.montantCsv(e.operatorTotalCashed), A.montantCsv(e.operatorTotalCanceled), A.montantCsv(e.operatorTotalLoss), e.operatorOrderCount, e.operatorGuestCount]; }));
+          A.telechargerCsv("employes.csv", ["Nom", "Total Ventes", "Total Encaissé", "Pourboires", "Total Annulé", "Total Pertes", "Commandes", "Couverts"],
+            l.map(function (e) { return [e.operatorName, A.montantCsv(e.operatorTotalOrderSales), A.montantCsv(e.operatorTotalCashed), A.montantCsv(e.operatorTotalTips), A.montantCsv(e.operatorTotalCanceled), A.montantCsv(e.operatorTotalLoss), e.operatorOrderCount, e.operatorGuestCount]; }));
         };
         function top(titre, cols, rangees) {
           return A.carte(titre, A.table(cols, rangees, null), {});
@@ -332,14 +373,14 @@
         var ventes = l.slice(0, 5).map(function (e) { return [E(e.operatorName), A.euro(e.operatorTotalOrderSales)]; });
         var remises = l.slice().sort(function (a, b) { return b.operatorTotalDiscount - a.operatorTotalDiscount; }).slice(0, 5).map(function (e) { return [E(e.operatorName), A.entier(e.operatorTotalDiscountQuantity), A.euro(e.operatorTotalDiscount)]; });
         var annul = l.slice().sort(function (a, b) { return b.operatorTotalCanceled - a.operatorTotalCanceled; }).slice(0, 5).map(function (e) { return [E(e.operatorName), A.entier(e.operatorTotalCanceledQuantity), A.euro(e.operatorTotalCanceled)]; });
-        var s = { v: 0, c: 0, a: 0, n: 0, g: 0, r: 0 };
-        l.forEach(function (e) { s.v += e.operatorTotalOrderSales; s.c += e.operatorTotalCashed; s.a += e.operatorTotalCanceled; s.n += e.operatorOrderCount; s.g += e.operatorGuestCount; s.r += e.operatorTotalDiscount; });
+        var s = { v: 0, c: 0, a: 0, n: 0, g: 0, r: 0, p: 0, t: 0 };
+        l.forEach(function (e) { s.v += e.operatorTotalOrderSales; s.c += e.operatorTotalCashed; s.a += e.operatorTotalCanceled; s.n += e.operatorOrderCount; s.g += e.operatorGuestCount; s.r += e.operatorTotalDiscount; s.p += e.operatorTotalLoss; s.t += e.operatorTotalTips; });
         zone.innerHTML = '<div class="trois-col">' + top("Top Ventes", [{ t: "Nom" }, d("Total")], ventes) + top("Top Remises", [{ t: "Nom" }, d("Quantité"), d("Total")], remises) +
           top("Top Annulations", [{ t: "Nom" }, d("Quantité"), d("Total")], annul) + "</div>" +
           A.carte("Tableau des Employés", '<div class="defile-x">' + A.table(
-            [{ t: "Nom" }, d("Total Ventes"), d("Total Encaissé"), d("Total Annulé"), d("Total Pertes"), d("Nombres de Commandes"), d("Nombre de Couverts"), d("Total Remises"), d("Couvert moyen"), d("Commande moyenne")],
-            l.map(function (e) { return [E(e.operatorName), A.euro(e.operatorTotalOrderSales), A.euro(e.operatorTotalCashed), A.euro(e.operatorTotalCanceled), A.euro(e.operatorTotalLoss), A.entier(e.operatorOrderCount), A.entier(e.operatorGuestCount), A.euro(e.operatorTotalDiscount), A.euro(e.operatorAverageCover), A.euro(e.operatorAverageOrder)]; }),
-            ["<b>Total</b>", "<b>" + A.euro(s.v) + "</b>", "<b>" + A.euro(s.c) + "</b>", "<b>" + A.euro(s.a) + "</b>", "<b>" + A.euro(0) + "</b>", "<b>" + A.entier(s.n) + "</b>", "<b>" + A.entier(s.g) + "</b>", "<b>" + A.euro(s.r) + "</b>", "", ""]) + "</div>");
+            [{ t: "Nom" }, d("Total Ventes"), d("Total Encaissé"), d("Pourboires"), d("Total Annulé"), d("Total Pertes"), d("Nombres de Commandes"), d("Nombre de Couverts"), d("Total Remises"), d("Couvert moyen"), d("Commande moyenne")],
+            l.map(function (e) { return [E(e.operatorName), A.euro(e.operatorTotalOrderSales), A.euro(e.operatorTotalCashed), A.euro(e.operatorTotalTips), A.euro(e.operatorTotalCanceled), A.euro(e.operatorTotalLoss), A.entier(e.operatorOrderCount), A.entier(e.operatorGuestCount), A.euro(e.operatorTotalDiscount), A.euro(e.operatorAverageCover), A.euro(e.operatorAverageOrder)]; }),
+            ["<b>Total</b>", "<b>" + A.euro(s.v) + "</b>", "<b>" + A.euro(s.c) + "</b>", "<b>" + A.euro(s.t) + "</b>", "<b>" + A.euro(s.a) + "</b>", "<b>" + A.euro(s.p) + "</b>", "<b>" + A.entier(s.n) + "</b>", "<b>" + A.entier(s.g) + "</b>", "<b>" + A.euro(s.r) + "</b>", "", ""]) + "</div>");
       });
     }
   });
@@ -376,9 +417,20 @@
     section: "rapports", fil: FIL("Pertes"), filtres: FILTRES, actions: function () { return exportCsv(); },
     rendre: function (ctx, zone) {
       D.getReportLosses(P(ctx)).then(function (r) {
-        A.act.export = function () { A.telechargerCsv("pertes.csv", ["Raison", "Produits", "Quantité", "Montant"], []); };
-        zone.innerHTML = '<div class="deux-col">' + A.kpi("Quantité totale de pertes", r.blocStats.totalQuantity) + A.kpi("Montant total des pertes", A.euro(r.blocStats.total)) + "</div>" +
-          A.carte("Tableau des pertes", A.table([{ t: "Raison" }, { t: "Produits" }, d("Quantité"), d("Montant")], []) + '<div class="vide-ligne centre">Aucun élément disponible</div>');
+        A.act.export = function () {
+          A.telechargerCsv("pertes.csv", ["Date", "Heure", "Produit", "Quantité", "Raison", "Employé", "Montant"],
+            r.lossListByOrder.map(function (x) { return [x.date, x.heure, x.produit, x.quantite, x.motif, x.employe, A.montantCsv(x.montant)]; }));
+        };
+        var b = r.blocStats;
+        zone.innerHTML = '<div class="deux-col">' + A.kpi("Quantité totale de pertes", A.entier(b.totalQuantity)) + A.kpi("Montant total des pertes", A.euro(b.total)) + "</div>" +
+          A.carte("Tableau des pertes", r.lossByReason.length ? '<div class="depl">' + A.table([{ t: "Raison" }, { t: "Produits" }, d("Quantité"), d("Montant")],
+            r.lossByReason.map(function (x) { return [E(x.reason), x.productList.length + " produit" + (x.productList.length > 1 ? "s" : ""), "<b>" + A.entier(x.quantity) + "</b>", "<b>" + A.euro(x.amount) + "</b>"]; }),
+            ["<b>Total</b>", "", "<b>" + A.entier(b.totalQuantity) + "</b>", "<b>" + A.euro(b.total) + "</b>"],
+            { details: function (n) { return r.lossByReason[n].productList.map(function (p) { return ["", E(p.name), A.entier(p.quantity), A.euro(p.amount)]; }); } }) + "</div>" :
+            '<div class="vide-ligne centre">Aucune perte sur la période</div>') +
+          (r.lossListByOrder.length ? A.carte("Détail des pertes déclarées", A.table([{ t: "Date" }, { t: "Heure" }, { t: "Produit" }, d("Quantité"), { t: "Raison" }, { t: "Employé" }, d("Montant")],
+            r.lossListByOrder.slice(0, 40).map(function (x) { return [A.dateCourte(x.date), x.heure, E(x.produit), A.entier(x.quantite), E(x.motif), E(x.employe), A.euro(x.montant)]; }), null, { classe: "zebre" })) : "");
+        A.brancherDepliables(zone);
       });
     }
   });
@@ -493,7 +545,7 @@
         var legende = A.graph.legende(r.categories.map(function (c, i) { return { nom: c, couleur: r.couleurs[i] }; }));
         var max = 0, heat = {};
         r.heatmap.forEach(function (h) { heat[h.jour + "-" + h.heure] = h.valeur; if (h.valeur > max) max = h.valeur; });
-        var heures = []; for (var h = 10; h <= 18; h++) heures.push(h);
+        var heures = []; for (var h = 8; h <= 22; h++) heures.push(h);
         var carte = '<div class="heat"><table><thead><tr><th></th>' + heures.map(function (x) { return "<th>" + x + "h</th>"; }).join("") + "</tr></thead><tbody>" +
           [0, 1, 2, 3, 4, 5, 6].map(function (j) {
             return "<tr><th class=\"g\">" + r.parJour[j].day + "</th>" + heures.map(function (x) {
@@ -538,7 +590,7 @@
       D.getNewHistoryZTill(P(ctx)).then(function (l) {
         var tot = 0; l.forEach(function (z) { tot += z.totalSales; });
         zone.innerHTML = A.carte("", A.table([{ t: "Date" }, { t: "Créneaux" }, d("Total TTC"), { t: "" }],
-          l.map(function (z) { return ['<a href="#/reports/sales-report/z-report/daily/' + z.id + '">' + A.dateMoyenne(z.date).replace(/^(\d+) /, "$1 ") + "</a>", "-", "<b>" + A.euro(z.totalSales) + "</b>", '<a class="oeil" href="#/reports/sales-report/z-report/daily/' + z.id + '" title="Voir le détail">' + A.icones.oeil + "</a>"]; }),
+          l.map(function (z) { return ['<a href="#/reports/sales-report/z-report/daily/' + z.id + '">' + A.dateMoyenne(z.date).replace(/^(\d+) /, "$1 ") + "</a>", '<span class="creneaux-z">' + z.creneaux.map(function (c) { return '<span><span class="doux">' + E(c.nom.replace(/^Service (du |de )?/i, "")) + "</span> " + A.euro(c.total) + "</span>"; }).join("") + "</span>", "<b>" + A.euro(z.totalSales) + "</b>", '<a class="oeil" href="#/reports/sales-report/z-report/daily/' + z.id + '" title="Voir le détail">' + A.icones.oeil + "</a>"]; }),
           ["<b>Total sur la période</b>", "", "<b>" + A.euro(tot) + "</b>", ""], { classe: "liste-z" }), { classe: "sans-titre" });
         if (!l.length) zone.innerHTML = A.vide();
       });
@@ -568,6 +620,7 @@
           bloc("Paiements", tab([{ t: "Mode" }, d("Quantité"), d("Montant")], r.paymentSummary.map(function (p) { return [E(p.name), A.entier(p.quantity), A.euro(p.totalAmount)]; }))) +
           bloc("Produits", tab([{ t: "Produit" }, { t: "Catégorie" }, d("Quantité"), d("Total")], r.productSummary.slice(0, 15).map(function (p) { return [E(p.productName), E(p.category), A.entier(p.productQuantity), A.euro(p.productSales)]; }))) +
           bloc("Annulations", r.cancelationSummary.length ? tab([{ t: "Motif" }, d("Quantité"), d("Montant")], r.cancelationSummary.map(function (c) { return [E(c.name), A.entier(c.quantity), A.euro(c.amount)]; })) : '<div class="vide-ligne centre">Aucune annulation</div>') +
+          bloc("Créneaux de service", tab([{ t: "Créneau" }, d("Total TTC")], r.creneaux.map(function (c) { return [E(c.nom), A.euro(c.total)]; }))) +
           bloc("Salles", tab([{ t: "Salle" }, d("Commandes"), d("Couverts"), d("Total TTC")], r.roomSummary.map(function (x) { return [E(x.name), A.entier(x.orderCount), A.entier(x.guestCount), A.euro(x.total)]; })));
       });
     }
@@ -589,7 +642,14 @@
           return '<div class="archive"><div class="archive-haut"><span><b>' + E(x.titre) + "</b> - Sauvegardé le " + x.sauvegarde + '</span><span class="badge-type ' + (x.type === "Mensuelle" ? "mens" : "jour") + '"><i></i>' + x.type + "</span></div>" +
             '<button class="fichier" data-act="dl" data-val="' + E(x.fichier) + '">' + E(x.fichier) + " +</button></div>";
         }).join("") + "</div>" + (liste.length ? "" : A.vide("Aucune archive trouvée"));
-        A.act.dl = function (nom) { A.telechargerCsv(nom, ["Archive fiscale (exemple)"], [["Données de démonstration"]]); };
+        A.act.dl = function (nom) {
+          var x = l.filter(function (y) { return y.fichier === nom; })[0];
+          if (!x) return;
+          D.getContenuArchive(x.id).then(function (c) {
+            A.telechargerCsv(nom, c.entetes, c.lignes.map(function (lg) { return lg.map(function (v, i) { return i >= 6 && typeof v === "number" ? A.montantCsv(v) : v; }); }));
+            A.info("Archive " + nom + " téléchargée.");
+          });
+        };
       });
     }
   });

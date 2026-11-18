@@ -560,6 +560,9 @@
       '<div class="chat-fil" id="chat-fil"></div>' +
       '<form class="chat-saisie" autocomplete="off"><input type="text" id="chat-champ" placeholder="Ex. : top 5 des produits du mois en camembert" aria-label="Votre demande"><button type="submit" class="bouton sombre">Envoyer</button></form>';
     document.body.appendChild(bouton);
+    var pastille = document.createElement("span");
+    pastille.className = "badge-nouveau chat-nouveau"; pastille.textContent = "Nouveau";
+    document.body.appendChild(pastille);
     document.body.appendChild(panneau);
     fil = document.getElementById("chat-fil"); champ = document.getElementById("chat-champ");
     panneau.querySelector("form").addEventListener("submit", function (e) {
