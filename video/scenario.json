@@ -77,8 +77,8 @@
         },
         {
           "id": "b4",
-          "texte": "L'avantage : les commandes et le planning de l'équipe s'anticipent.",
-          "dit": "L'avantage : les commandes et le planning de l'équipe s'anticipent."
+          "texte": "L'avantage : on anticipe les commandes et le planning de l'équipe.",
+          "dit": "L'avantage : on anticipe les commandes et le planning de l'équipe."
         }
       ]
     },
@@ -101,8 +101,8 @@
         },
         {
           "id": "c3",
-          "texte": "Le tableau des stocks montre ce qui est à commander, avec l'historique de chaque mouvement.",
-          "dit": "Le tableau des stocks montre ce qui est à commander, avec l'historique de chaque mouvement."
+          "texte": "Le tableau des stocks signale les produits à commander, avec l'historique de chaque mouvement.",
+          "dit": "Le tableau des stocks signale les produits à commander, avec l'historique de chaque mouvement."
         },
         {
           "id": "c4",
@@ -174,8 +174,8 @@
         },
         {
           "id": "r5",
-          "texte": "L'avantage : toute l'équipe sait qui arrive, et quand.",
-          "dit": "L'avantage : toute l'équipe sait qui arrive, et quand."
+          "texte": "L'avantage : en salle comme en cuisine, toute l'équipe connaît les arrivées.",
+          "dit": "L'avantage : en salle comme en cuisine, toute l'équipe connaît les arrivées."
         }
       ]
     },
@@ -193,8 +193,8 @@
         },
         {
           "id": "g2",
-          "texte": "Créer un bon ne prend qu'un instant : montant, validité, occasion, et un code unique.",
-          "dit": "Créer un bon ne prend qu'un instant : montant, validité, occasion, et un code unique."
+          "texte": "Créer un bon ne prend qu'un instant : montant, validité, occasion, et un code unique, généré automatiquement.",
+          "dit": "Créer un bon ne prend qu'un instant : montant, validité, occasion, et un code unique, généré automatiquement."
         },
         {
           "id": "g3",

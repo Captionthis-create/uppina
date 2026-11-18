@@ -78,7 +78,7 @@ function coupe(txt) {
     const a = mots.slice(0, k).join(" "), b = mots.slice(k).join(" ");
     const consistant = Math.min(a.length, b.length) >= 0.3 * txt.length;
     const cout = Math.abs(a.length - b.length)
-      - (consistant && /[.:;…]$/.test(a) ? 30 : consistant && /,$/.test(a) ? 16 : 0)
+      - (consistant && /[.:;…]$/.test(a) ? 50 : consistant && /,$/.test(a) ? 16 : 0)
       - (OUTILS.test(mots[k]) ? 6 : 0) + (OUTILS.test(mots[k - 1]) ? 12 : 0);
     if (!best || cout < best.cout) best = { cout, parts: [a, b] };
   }

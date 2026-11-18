@@ -50,10 +50,10 @@ def main():
     musique = lire(os.path.join(B, "musique.wav"))[:n]
     if len(musique) < n:
         musique = np.vstack([musique, np.zeros((n - len(musique), 2))])
-    # Musique : environ 11 dB sous la voix, et encore 8 dB plus bas pendant qu'elle parle (attaque 80 ms, relâche 600 ms)
+    # Musique : environ 11 dB sous la voix, et encore 12 dB plus bas pendant qu'elle parle (attaque 80 ms, relâche 600 ms)
     rms_m = np.sqrt(np.mean(musique ** 2))
     musique *= 10 ** ((-18 - 11) / 20) / max(rms_m, 1e-9)
-    cible = np.where(parle, 10 ** (-8 / 20), 1.0)
+    cible = np.where(parle, 10 ** (-12 / 20), 1.0)
     g = np.empty(nb)
     v = 1.0
     for k in range(nb):
