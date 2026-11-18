@@ -74,7 +74,8 @@ Résultat : `build/uppina-accueil.mp4` et `build/uppina-accueil.srt`. Le dossier
 2. `python voix.py` : voix off, une phrase par fichier. Chaque phrase est **contrôlée automatiquement** : Whisper
    (`large-v3-turbo`) la retranscrit, et si l'écart avec le texte est trop grand ou si le débit est anormal, elle est
    régénérée avec une autre graine (6 essais au plus, le meilleur est gardé). Les transcriptions sont dans
-   `build/voix/controle.json`.
+   `build/voix/controle.json`. Pour refaire une phrase : `python voix.py --strict <id>` (transcription exacte
+   exigée), et `--graine 1`, `--graine 2`… pour essayer d'autres tirages.
 3. `node timeline.js` : place chaque phrase dans le temps et écrit le minutage et les sous-titres `.srt`.
    La table `MIN_ECRAN` de `timeline.js` fixe la durée d'écran minimale des phrases qui portent une animation :
    une voix plus rapide ne raccourcit pas les démonstrations.

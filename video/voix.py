@@ -14,6 +14,7 @@ Contrôle: chaque phrase est transcrite ; si l'écart avec le texte est trop gra
 Usage   : python voix.py            (toutes les phrases)
           python voix.py m4 n1      (seulement certaines)
           python voix.py --strict a1  (n'accepter qu'une transcription exacte, sinon garder le meilleur des 6 essais)
+          python voix.py --graine 2 a1  (autre série de tirages, si les 6 premiers ne conviennent pas)
 Licences: modèles Kyutai sous CC-BY 4.0 ; voix CML-TTS sous CC-BY 4.0, voix enregistrées par Kyutai sous CC0 :
           l'attribution figure au générique.
 """
@@ -74,8 +75,9 @@ def normaliser(s):
 
 
 # Mots ignorés dans le contrôle : noms propres, sigles et nombres, que Whisper écrit à sa façon (Up'Pina, 8h05, FEC…)
-IGNORES = re.compile(r"^(eupe|pina|pop|i|a|hi|ha|f|e|c|ttc|sms|\d.*|un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|"
-                     r"quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|mille|et|heures?|h|pour|euros?|€|%)$")
+IGNORES = re.compile(r"^(eupe|pina|pop|i|a|hi|ha|f|e|c|s|v|ttc|sms|fec|csv|\d.*|un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|"
+                     r"quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|mille|et|heures?|h|pour|euros?|€|%|"
+                     r"h?o+p+ina|e?u+p+ina|up|poppy|popia|popya)$")
 
 
 def ecart(ref, hyp):
@@ -131,7 +133,8 @@ def main():
     durees = json.load(open(f_durees)) if os.path.exists(f_durees) else {}
     controle = json.load(open(f_controle, encoding="utf-8")) if os.path.exists(f_controle) else {}
     strict = "--strict" in sys.argv
-    voulus = set(a for a in sys.argv[1:] if not a.startswith("--"))
+    serie = int(sys.argv[sys.argv.index("--graine") + 1]) if "--graine" in sys.argv else 0
+    voulus = set(a for i, a in enumerate(sys.argv[1:], 1) if not a.startswith("--") and sys.argv[i - 1] != "--graine")
     for scene in sc["scenes"]:
         for b in scene["beats"]:
             if voulus and b["id"] not in voulus:
@@ -139,7 +142,7 @@ def main():
             mots = len(normaliser(b["dit"]).split())
             meilleur = None
             for essai in range(ESSAIS):
-                torch.manual_seed(1000 * essai + sum(map(ord, b["id"])))
+                torch.manual_seed(100000 * serie + 1000 * essai + sum(map(ord, b["id"])))
                 x = dire(b["dit"])
                 x = rogner(x, sr)
                 duree = len(x) / sr

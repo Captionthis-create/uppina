@@ -21,8 +21,8 @@ const TRANSITION = 1.15;   // silence entre deux séquences (titre de l'heure)
 const FIN = 5.2;           // générique après la dernière phrase
 // Durée d'écran minimale de certaines phrases (s, depuis leur début) : le temps que jouent leurs animations
 const MIN_ECRAN = {
-  a2: 6.0, a3: 5.6, b2: 5.6, b3: 7.6, c2: 7.2, c3: 6.2, c4: 5.4, e2: 6.2, e3: 3.6,
-  r2: 6.8, r3: 7.2, r4: 4.6, g2: 7.6, g3: 4.4, o2: 4.6, o3: 5.2, p1: 3.0, p2: 6.0, p3: 4.4, p4: 4.4, x2: 7.0
+  a2: 6.0, a3: 5.6, b2: 5.6, b3: 7.6, c2: 7.2, c3: 5.6, c4: 5.4, e2: 5.8, e3: 3.6,
+  r2: 6.0, r3: 7.2, r4: 4.6, g2: 6.6, g3: 4.4, o2: 4.6, o3: 5.2, p1: 3.0, p2: 5.2, p3: 3.8, p4: 4.4, x2: 7.0
 };
 // Temps supplémentaire après certaines phrases : cartons, bandeaux « L'avantage »
 const APRES = {
