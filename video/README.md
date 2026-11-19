@@ -1,6 +1,6 @@
 # Vidéo « Les nouveautés de l'accueil Up'Pina »
 
-Vidéo de présentation de l'accueil d'Up'Pina (environ 3 min 30, 1920 × 1080, 30 images/s), destinée à la direction.
+Vidéo de présentation de l'accueil d'Up'Pina (environ 3 min, 1920 × 1080, 30 images/s), destinée à la direction.
 Elle est **entièrement générée** à partir de la démo de ce dépôt : captures HD de la vraie interface, animées en
 motion design, voix off de synthèse, musique générée et sous-titres incrustés. Toutes les données affichées sont
 celles, simulées, de la démo (Crêperie Démo, Rennes).
@@ -25,7 +25,12 @@ factuelle sur la vraie interface, puis un bandeau « L'avantage ». Une frise en
 | Fin | Mosaïque des neuf modules, logo, mention « données simulées », crédits de la voix | |
 
 Le texte de la voix off et des sous-titres est dans [`scenario.json`](scenario.json) (`texte` = sous-titre,
-`dit` = texte prononcé, écrit phonétiquement : « Eupe-pina », « Pop i a », « F E C » ; `avantage` = texte du bandeau).
+`dit` = texte prononcé, écrit phonétiquement pour la voix choisie : « Eup'pina », « Pop i a », « F.E.C. » ;
+`avantage` = texte du bandeau).
+
+Le rythme se règle avec `vitesse` (1,2 par défaut) : tout le film est accéléré d'autant à la sortie (animations,
+transitions, sous-titres, et la voix, accélérée sans changer sa hauteur). La chorégraphie de `scene/film.js` et le
+minutage restent écrits en « temps du film », à vitesse naturelle de la voix.
 
 ## La voix
 
@@ -34,8 +39,10 @@ tournent sur le processeur, sans service en ligne :
 
 | `moteur` | Modèle | `nom` | Vitesse |
 | --- | --- | --- | --- |
-| `pocket-tts` (par défaut) | [Pocket TTS](https://huggingface.co/kyutai/pocket-tts-without-voice-cloning), français 24 couches (`langue` : `french_24l`) | voix prédéfinie, ex. `estelle` | ≈ temps réel |
-| `kyutai-1.6b` | [Kyutai TTS 1.6B](https://huggingface.co/kyutai/tts-1.6b-en_fr) (français et anglais) | fichier de la banque [`kyutai/tts-voices`](https://huggingface.co/kyutai/tts-voices), ex. `cml-tts/fr/928_486_000075-0001_enhanced.wav` | ≈ 5 à 6 × le temps réel |
+| `kyutai-1.6b` (choisi) | [Kyutai TTS 1.6B](https://huggingface.co/kyutai/tts-1.6b-en_fr) (français et anglais) | fichier de la banque [`kyutai/tts-voices`](https://huggingface.co/kyutai/tts-voices) : voix d'homme `cml-tts/fr/928_486_000075-0001_enhanced.wav` | ≈ 10 × le temps réel (≈ 30 min pour le film) |
+| `pocket-tts` | [Pocket TTS](https://huggingface.co/kyutai/pocket-tts-without-voice-cloning), français 24 couches (`langue` : `french_24l`) | voix prédéfinie, ex. `estelle` | ≈ temps réel |
+
+Les graphies phonétiques du champ `dit` dépendent du modèle : avec Pocket TTS (Estelle), « Eupe-pina » et « F E C ».
 
 Les modèles sont sous licence **CC-BY 4.0** ; les voix `cml-tts/fr` sont sous CC-BY 4.0, celles enregistrées par
 Kyutai (`unmute-prod-website`) sous CC0. Le champ `credit` est affiché au générique de fin : l'adapter quand on
@@ -79,11 +86,13 @@ Résultat : `build/uppina-accueil.mp4` et `build/uppina-accueil.srt`. Le dossier
 3. `node timeline.js` : place chaque phrase dans le temps et écrit le minutage et les sous-titres `.srt`.
    La table `MIN_ECRAN` de `timeline.js` fixe la durée d'écran minimale des phrases qui portent une animation :
    une voix plus rapide ne raccourcit pas les démonstrations.
-4. `python musique.py` : nappe musicale générée (ré majeur, 92 BPM), dont l'intensité suit les modules.
+4. `python musique.py` : musique générée (ré majeur, 112 BPM) : rythmique entraînante sur les modules, accent
+   (montée, cymbale, impact) sur chaque carton « Nouveau », résolution au générique.
 5. `node rendu.js video` : rend la scène animée [`scene/`](scene/) image par image (Chromium) et l'encode en H.264.
-   `node rendu.js apercu 12.5 47` produit des images isolées dans `build/apercu/` pour vérifier le montage.
-6. `python mixage.py` puis l'assemblage ffmpeg de `fabriquer.sh` : voix + musique (baissée sous la voix),
-   normalisée à −16 LUFS.
+   `node rendu.js apercu 12.5 47` produit des images isolées dans `build/apercu/` pour vérifier le montage
+   (temps de la vidéo finale).
+6. `python mixage.py` puis l'assemblage ffmpeg de `fabriquer.sh` : voix (accélérée de `vitesse` avec le filtre
+   `atempo` de ffmpeg) + musique (baissée de 12 dB pendant la voix), normalisée à −16 LUFS.
 
 ## Modifier
 

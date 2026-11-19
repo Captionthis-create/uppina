@@ -12,12 +12,15 @@ const ICI = __dirname;
 const sc = JSON.parse(fs.readFileSync(path.join(ICI, "scenario.json"), "utf8"));
 const durees = JSON.parse(fs.readFileSync(path.join(ICI, "build", "voix", "durees.json"), "utf8"));
 const captures = JSON.parse(fs.readFileSync(path.join(ICI, "build", "captures", "captures.json"), "utf8"));
+// Tout le minutage est en « temps du film » (celui de la chorégraphie, voix à vitesse naturelle). À la sortie, le film
+// est accéléré de VITESSE : image à l'instant t = temps du film / VITESSE, voix étirée d'autant (rubberband).
+const VITESSE = sc.vitesse || 1;
 const ESTIMER = process.argv.includes("--estimer");  // durées manquantes estimées (aperçu avant la voix)
 const estimees = [];
 const FPS = 30;
 const AMORCE = 2.4;        // animation du logo avant la première phrase
-const ECART = 0.35;        // silence entre deux phrases d'une même séquence
-const TRANSITION = 1.15;   // silence entre deux séquences (titre de l'heure)
+const ECART = 0.3;         // silence entre deux phrases d'un même module
+const TRANSITION = 1.0;    // silence entre deux modules (carton « Nouveau »)
 const FIN = 5.2;           // générique après la dernière phrase
 // Durée d'écran minimale de certaines phrases (s, depuis leur début) : le temps que jouent leurs animations
 const MIN_ECRAN = {
@@ -26,9 +29,9 @@ const MIN_ECRAN = {
 };
 // Temps supplémentaire après certaines phrases : cartons, bandeaux « L'avantage »
 const APRES = {
-  i2: 0.9,
+  i2: 0.7,
   a1: 0.2, b1: 0.2, c1: 0.2, e1: 0.2, r1: 0.2, g1: 0.2, o1: 0.2, x1: 0.2,
-  a4: 1.2, b4: 1.2, c5: 1.2, e4: 1.2, r5: 1.2, g4: 1.2, o4: 1.2, p5: 1.2, x3: 1.6
+  a4: 0.9, b4: 0.9, c5: 0.9, e4: 0.9, r5: 0.9, g4: 0.9, o4: 0.9, p5: 0.9, x3: 1.3
 };
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
@@ -103,7 +106,7 @@ function decouper(maxCarton, maxLigne, ecartCartons) {
 // .srt : normes usuelles (42 caractères par ligne, 2 lignes) ; incrustés : lignes plus longues, l'écran est large
 const cartonsSrt = decouper(84, 42, 0.04), cartonsFilm = decouper(110, 56, 0);
 
-const timeline = { fps: FPS, duree, images: Math.ceil(duree * FPS), titre: sc.titre, creditVoix: sc.voix.credit || "", scenes, beats, ordre, soustitres: cartonsFilm };
+const timeline = { fps: FPS, duree, vitesse: VITESSE, dureeSortie: r3(duree / VITESSE), images: Math.ceil(duree / VITESSE * FPS), titre: sc.titre, creditVoix: sc.voix.credit || "", scenes, beats, ordre, soustitres: cartonsFilm };
 fs.writeFileSync(path.join(ICI, "build", "timeline.json"), JSON.stringify(timeline, null, 1));
 fs.writeFileSync(path.join(ICI, "build", "timeline.js"),
   "window.TIMELINE = " + JSON.stringify(timeline) + ";\nwindow.CAPTURES = " + JSON.stringify(captures.captures) + ";\nwindow.TEXTES = " + JSON.stringify(captures.textes) + ";\n");
@@ -113,10 +116,11 @@ function hms(x) {
   return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0") + "," + String(ms % 1000).padStart(3, "0");
 }
 const srt = cartonsSrt.map(function (c, i) {
-  return (i + 1) + "\n" + hms(c.debut) + " --> " + hms(c.fin) + "\n" + c.lignes.join("\n").replace(/\u00a0/g, " ") + "\n";
+  return (i + 1) + "\n" + hms(c.debut / VITESSE) + " --> " + hms(c.fin / VITESSE) + "\n" + c.lignes.join("\n").replace(/\u00a0/g, " ") + "\n";
 }).join("\n");
 fs.writeFileSync(path.join(ICI, "build", "uppina-accueil.srt"), srt);
 
 if (estimees.length) console.log("⚠ Durées estimées (voix pas encore générée) : " + estimees.join(" "));
-console.log("Durée : " + Math.floor(duree / 60) + " min " + (duree % 60).toFixed(1) + " s (" + timeline.images + " images)");
-scenes.forEach(function (s) { console.log("  " + s.id.padEnd(9) + " " + s.debut.toFixed(2).padStart(7) + " → " + s.fin.toFixed(2).padStart(7)); });
+const ds = duree / VITESSE;
+console.log("Durée : " + Math.floor(ds / 60) + " min " + (ds % 60).toFixed(1) + " s (" + timeline.images + " images, vitesse ×" + VITESSE + ")");
+scenes.forEach(function (s) { console.log("  " + s.id.padEnd(9) + " " + (s.debut / VITESSE).toFixed(2).padStart(7) + " → " + (s.fin / VITESSE).toFixed(2).padStart(7)); });

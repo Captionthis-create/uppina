@@ -2,6 +2,7 @@
  * rendu.js : rend la scène animée (scene/index.html) image par image.
  *   node rendu.js apercu 12.5 31 47.2   → build/apercu/t-0012.50.png … (images isolées, pour vérifier le montage)
  *   node rendu.js video [--travailleurs 4] [--de 0 --a 30]  → build/video-sans-son.mp4
+ * Les temps donnés sont ceux de la vidéo finale : l'image de l'instant t montre le film à t × vitesse (scenario.json).
  * Chaque image est calculée par window.FILM.rendre(t), puis capturée (CDP) et envoyée à ffmpeg.
  */
 const fs = require("fs");
@@ -58,7 +59,7 @@ async function apercu(temps) {
   const { page, cdp } = await ouvrirScene(nav);
   for (const t of temps) {
     const f = path.join(dossier, "t-" + t.toFixed(2).padStart(7, "0") + ".png");
-    fs.writeFileSync(f, await image(page, cdp, t, "png"));
+    fs.writeFileSync(f, await image(page, cdp, t * (TL.vitesse || 1), "png"));
     console.log(f);
   }
   await nav.close();
@@ -82,7 +83,7 @@ async function video() {
     mc.fichier = path.join(dossier, "morceau-" + mc.i + ".mp4");
     const { ff, fin } = ffmpegVers(mc.fichier, fps);
     for (let i = mc.d; i < mc.f; i++) {
-      const buf = await image(page, cdp, i / fps, "jpeg");
+      const buf = await image(page, cdp, i / fps * (TL.vitesse || 1), "jpeg");
       if (!ff.stdin.write(buf)) await new Promise(function (ok) { ff.stdin.once("drain", ok); });
       faites++;
       if (faites % 150 === 0) {

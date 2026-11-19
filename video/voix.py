@@ -28,6 +28,10 @@ import wave
 from math import gcd
 
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")  # téléchargement HTTP classique (derrière certains proxys, Xet est bloqué)
+# Modèles déjà téléchargés : pas de vérification en ligne (le chargement passe de plusieurs minutes à quelques secondes)
+_CACHE = os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
+if all(os.path.isdir(os.path.join(_CACHE, d)) for d in ("models--kyutai--tts-1.6b-en_fr", "models--kyutai--tts-voices", "models--mobiuslabsgmbh--faster-whisper-large-v3-turbo")):
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 import numpy as np
 import soundfile as sf
@@ -77,13 +81,21 @@ def normaliser(s):
 # Mots ignorés dans le contrôle : noms propres, sigles et nombres, que Whisper écrit à sa façon (Up'Pina, 8h05, FEC…)
 IGNORES = re.compile(r"^(eupe|pina|pop|i|a|hi|ha|f|e|c|s|v|ttc|sms|fec|csv|\d.*|un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|"
                      r"quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|mille|et|heures?|h|pour|euros?|€|%|"
-                     r"h?o+p+ina|e?u+p+ina|up|poppy|popia|popya)$")
+                     r"h?o+p+ina|e?u+p+'?p*ina|up|poppy|popia|popya)$")
+
+
+def cle(mot):
+    """Forme comparée d'un mot : sans les finales muettes (pluriels, accords), pour ne pas compter
+    « chiffres / chiffre », « corrigé / corrigée », « s'anticipe / s'anticipent » comme des erreurs."""
+    for _ in range(2):
+        mot = re.sub(r"(ent|es|e|s|x|t|d)$", "", mot) or mot
+    return mot
 
 
 def ecart(ref, hyp):
-    """Taux d'erreur sur les mots (Levenshtein), sans les mots ignorés."""
-    r = [w for w in normaliser(ref).replace("-", " ").split() if not IGNORES.match(w)]
-    h = [w for w in normaliser(hyp).replace("-", " ").split() if not IGNORES.match(w)]
+    """Taux d'erreur sur les mots (Levenshtein), sans les mots ignorés ni les différences d'accord inaudibles."""
+    r = [cle(w) for w in normaliser(ref).replace("-", " ").split() if not IGNORES.match(w)]
+    h = [cle(w) for w in normaliser(hyp).replace("-", " ").split() if not IGNORES.match(w)]
     d = list(range(len(h) + 1))
     for i in range(1, len(r) + 1):
         prec, d[0] = d[0], i
