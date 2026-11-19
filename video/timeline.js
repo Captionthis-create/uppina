@@ -18,20 +18,20 @@ const VITESSE = sc.vitesse || 1;
 const ESTIMER = process.argv.includes("--estimer");  // durées manquantes estimées (aperçu avant la voix)
 const estimees = [];
 const FPS = 30;
-const AMORCE = 2.4;        // animation du logo avant la première phrase
+const AMORCE = 2.0;        // animation du logo avant la première phrase
 const ECART = 0.3;         // silence entre deux phrases d'un même module
-const TRANSITION = 1.0;    // silence entre deux modules (carton « Nouveau »)
-const FIN = 5.2;           // générique après la dernière phrase
+const TRANSITION = 0.85;   // silence entre deux modules (carton « Nouveau »)
+const FIN = 4.8;           // générique après la dernière phrase
 // Durée d'écran minimale de certaines phrases (s, depuis leur début) : le temps que jouent leurs animations
 const MIN_ECRAN = {
   a2: 6.0, a3: 5.6, b2: 5.6, b3: 7.6, c2: 7.2, c3: 5.6, c4: 5.4, e2: 5.8, e3: 3.6,
-  r2: 6.0, r3: 7.2, r4: 4.6, g2: 6.6, g3: 4.4, o2: 4.6, o3: 5.2, p1: 3.0, p2: 5.2, p3: 3.8, p4: 4.4, x2: 7.0
+  r2: 6.0, r3: 7.2, r4: 4.6, g2: 6.6, g3: 4.4, o2: 4.6, o3: 5.2, p1: 2.6, p2: 5.2, p3: 3.4, p4: 4.0, x2: 7.0
 };
 // Temps supplémentaire après certaines phrases : cartons, bandeaux « L'avantage »
 const APRES = {
   i2: 0.7,
   a1: 0.2, b1: 0.2, c1: 0.2, e1: 0.2, r1: 0.2, g1: 0.2, o1: 0.2, x1: 0.2,
-  a4: 0.9, b4: 0.9, c5: 0.9, e4: 0.9, r5: 0.9, g4: 0.9, o4: 0.9, p5: 0.9, x3: 1.3
+  a4: 0.6, b4: 0.6, c5: 0.6, e4: 0.6, r5: 0.6, g4: 0.6, o4: 0.6, p5: 0.6, x3: 1.0
 };
 
 const r3 = (x) => Math.round(x * 1000) / 1000;

@@ -84,6 +84,17 @@ IGNORES = re.compile(r"^(eupe|pina|pop|i|a|hi|ha|f|e|c|s|v|ttc|sms|fec|csv|\d.*|
                      r"h?o+p+ina|e?u+p+'?p*ina|up|poppy|popia|popya)$")
 
 
+# Noms propres ignorés dans l'écart : on vérifie au moins qu'ils sont entendus en entier (pas de syllabe avalée)
+ENTENDUS = [
+    (re.compile(r"Eup'?e?-?pina", re.I), re.compile(r"\b(h?o|e|eu|u)\s?p{1,2}'?\s?ina\b", re.I)),  # Up'Pina, pas « Pina » seul
+    (re.compile(r"Pop i a", re.I), re.compile(r"\bpop\s?-?i\s?-?a\b|popia|poppy", re.I)),            # Pop'IA
+]
+
+
+def noms_manquants(dit, entendu):
+    return sum(1 for d, h in ENTENDUS if d.search(dit) and not h.search(entendu))
+
+
 def cle(mot):
     """Forme comparée d'un mot : sans les finales muettes (pluriels, accords), pour ne pas compter
     « chiffres / chiffre », « corrigé / corrigée », « s'anticipe / s'anticipent » comme des erreurs."""
@@ -162,8 +173,9 @@ def main():
                 transcrit = " ".join(s.text for s in asr.transcribe(resample_poly(x, 16000 // g, sr // g).astype(np.float32), language="fr", beam_size=5)[0]).strip()
                 e = ecart(b["dit"], transcrit)
                 debit = mots / max(duree, 0.1)
-                # Pénalité si le débit sort de la plage naturelle (silences anormaux ou phrase avalée)
-                note = e + (0.25 if not (2.0 <= debit <= 4.2) else 0.0)
+                # Pénalité si le débit sort de la plage naturelle (silences anormaux ou phrase avalée), ou si un nom
+                # propre n'est pas entendu en entier
+                note = e + (0.25 if not (2.0 <= debit <= 4.2) else 0.0) + 0.5 * noms_manquants(b["dit"], transcrit)
                 if meilleur is None or note < meilleur[0]:
                     meilleur = (note, x, transcrit, e, debit, essai)
                 if note <= (0.0 if strict else 0.08):
