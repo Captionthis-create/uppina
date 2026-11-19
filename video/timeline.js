@@ -57,7 +57,7 @@ sc.scenes.forEach(function (s, i) {
     }
     if (d === undefined) throw new Error("Durée manquante pour " + b.id + " : relancer voix.py (ou node timeline.js --estimer)");
     const creneau = Math.max(d, MIN_ECRAN[b.id] || 0);
-    // fin = fin du créneau (repère des animations) ; finVoix = fin réelle de la phrase (sous-titres)
+    // fin = fin du créneau (repère des animations) ; finVoix = fin de la phrase (sous-titres), ajustée plus bas
     beats[b.id] = { debut: r3(t), fin: r3(t + creneau), finVoix: r3(t + d), scene: s.id, texte: typo(b.texte) };
     ordre.push(b.id);
     t += creneau + (APRES[b.id] || 0);
@@ -66,6 +66,20 @@ sc.scenes.forEach(function (s, i) {
 });
 const duree = r3(t + FIN);
 scenes.forEach(function (s, i) { s.fin = i + 1 < scenes.length ? scenes[i + 1].debut : duree; });
+
+// Accélération de chaque phrase à la sortie : VITESSE, sauf si la diction dépasserait DEBIT_MAX mots par seconde
+// (titres courts) ; elle doit aussi finir avant la phrase suivante. Une phrase moins accélérée dure plus longtemps :
+// finVoix devient sa fin audible, ramenée en temps du film (sous-titres, mots repérés par film.js).
+const DEBIT_MAX = 3.6;
+ordre.forEach(function (id, k) {
+  const b = beats[id], d = b.finVoix - b.debut, mots = b.texte.replace(/\u00a0/g, " ").split(/\s+/).length;
+  let v = Math.min(VITESSE, Math.max(1, DEBIT_MAX * d / mots));
+  const suivant = ordre[k + 1] ? beats[ordre[k + 1]].debut : duree;
+  const place = (suivant - b.debut) / VITESSE - 0.12;
+  if (d / v > place) v = Math.min(VITESSE, d / place);
+  b.vitesseVoix = r3(v);
+  b.finVoix = r3(b.debut + d / v * VITESSE);
+});
 
 // Sous-titres : chaque phrase est découpée en cartons (au prorata des caractères pour le minutage),
 // chaque carton en deux lignes au plus, coupées près du milieu, de préférence après une ponctuation.

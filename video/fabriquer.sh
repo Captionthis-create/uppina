@@ -2,6 +2,7 @@
 # fabriquer.sh : fabrique la vidéo de bout en bout (≈ 10 min sur 4 cœurs).
 #   ./fabriquer.sh            toutes les étapes
 #   ./fabriquer.sh rendu      seulement : minutage → rendu → mixage → assemblage (captures et voix déjà faites)
+#   ./fabriquer.sh son        seulement : musique → mixage → assemblage (image déjà rendue, minutage inchangé)
 # Prérequis : Node 18+, Python 3.10+, ffmpeg ; « npm install » et un environnement Python avec
 # les paquets de requirements.txt (voir README.md). PYTHON peut pointer vers cet environnement.
 set -euo pipefail
@@ -15,12 +16,16 @@ if [ "${1:-tout}" = "tout" ]; then
   echo "2/6 Voix off (moteur et voix choisis dans scenario.json, contrôlée par Whisper)"
   "$PYTHON" voix.py
 fi
-echo "3/6 Minutage et sous-titres"
-node timeline.js
+if [ "${1:-tout}" != "son" ]; then
+  echo "3/6 Minutage et sous-titres"
+  node timeline.js
+fi
 echo "4/6 Musique"
 "$PYTHON" musique.py
-echo "5/6 Rendu image par image"
-node rendu.js video --travailleurs "${TRAVAILLEURS:-4}"
+if [ "${1:-tout}" != "son" ]; then
+  echo "5/6 Rendu image par image"
+  node rendu.js video --travailleurs "${TRAVAILLEURS:-4}"
+fi
 echo "6/6 Mixage et assemblage"
 "$PYTHON" mixage.py
 ffmpeg -y -loglevel error -i build/video-sans-son.mp4 -i build/audio.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -ar 48000 \

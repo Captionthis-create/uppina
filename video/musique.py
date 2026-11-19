@@ -169,9 +169,9 @@ def shaker():
 
 
 def cymbale():
-    n = int(2.6 * SR)
+    n = int(2.0 * SR)
     t = np.arange(n) / SR
-    return bruit_filtre(n, 3500, None) * np.exp(-t * 1.8) * np.clip(t / 0.002, 0, 1)
+    return bruit_filtre(n, 6000, None) * np.exp(-t * 2.6) * np.clip(t / 0.002, 0, 1)  # aiguë : ne masque pas la voix
 
 
 def impact():
@@ -238,7 +238,7 @@ def main():
     for sid in MODULES:
         d = SCENES[sid]["debut"]
         ajouter(accents, d - 0.9, montee(0.9) * 0.05)
-        ajouter(accents, d, cymbale() * 0.06, pan=0.15)
+        ajouter(accents, d, cymbale() * 0.04, pan=0.15)
         ajouter(accents, d, impact() * 0.32)
     ajouter(accents, T_FINAL - 1.2, montee(1.2) * 0.05)
     ajouter(accents, T_FINAL, cymbale() * 0.07)
