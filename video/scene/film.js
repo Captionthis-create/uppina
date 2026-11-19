@@ -620,7 +620,7 @@
     logo("fin", t, tLogo, 960, 420, 1, oL);
     var oS = p(t, tLogo + 0.5, tLogo + 1.2) * (1 - p(t, TL.duree - 0.9, TL.duree - 0.15));
     M.texte("fin-slogan", "Neuf nouveautés, un seul accueil : <b>tout le service au même endroit</b>.", "slogan", 0, 540 + 14 * (1 - p(t, tLogo + 0.5, tLogo + 1.2)), oS);
-    M.texte("fin-mention", "Démonstration · Crêperie Démo, Rennes · toutes les données affichées sont simulées<br>" + TL.creditVoix, "mention", 0, 968, p(t, tLogo + 0.9, tLogo + 1.6) * (1 - p(t, TL.duree - 0.9, TL.duree - 0.15)));
+    M.texte("fin-mention", "Démonstration · Crêperie Démo, Rennes · toutes les données affichées sont simulées<br>" + TL.creditVoix, "mention", 0, 968, p(t, tLogo + 0.6, tLogo + 1.2) * (1 - p(t, TL.duree - 0.9, TL.duree - 0.15)));
   }
 
   // ------------------------------------------------------------------ assemblage

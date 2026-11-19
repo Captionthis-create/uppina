@@ -21,7 +21,7 @@ const FPS = 30;
 const AMORCE = 2.0;        // animation du logo avant la première phrase
 const ECART = 0.3;         // silence entre deux phrases d'un même module
 const TRANSITION = 0.85;   // silence entre deux modules (carton « Nouveau »)
-const FIN = 4.8;           // générique après la dernière phrase
+const FIN = 6.0;           // générique après la dernière phrase
 // Durée d'écran minimale de certaines phrases (s, depuis leur début) : le temps que jouent leurs animations
 const MIN_ECRAN = {
   a2: 6.0, a3: 5.6, b2: 5.6, b3: 7.6, c2: 7.2, c3: 5.6, c4: 5.4, e2: 5.8, e3: 3.6,
