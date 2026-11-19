@@ -25,12 +25,13 @@ factuelle sur la vraie interface, puis un bandeau « L'avantage ». Une frise en
 | Fin | Mosaïque des neuf modules, logo, mention « données simulées », crédits de la voix | |
 
 Le texte de la voix off et des sous-titres est dans [`scenario.json`](scenario.json) (`texte` = sous-titre,
-`dit` = texte prononcé, écrit phonétiquement pour la voix choisie : « Eup'pina », « Pop i a », « F.E.C. » ;
+`dit` = texte prononcé, écrit phonétiquement pour la voix choisie : « Eupe-pina », « Pop i a », « F E C » ;
 `avantage` = texte du bandeau).
 
-Le rythme se règle avec `vitesse` (1,2 par défaut) : tout le film est accéléré d'autant à la sortie (animations,
-transitions, sous-titres, et la voix, accélérée sans changer sa hauteur). La chorégraphie de `scene/film.js` et le
-minutage restent écrits en « temps du film », à vitesse naturelle de la voix.
+Le rythme se règle avec `vitesse` (1,2 par défaut) : les animations et transitions sont accélérées d'autant à la
+sortie. La voix peut l'être aussi, sans changer sa hauteur, jusqu'à `voix.accelerationMax` : 1 par défaut, car une
+voix accélérée paraît forcée ; elle garde alors son débit naturel et le minutage lui laisse la place. La chorégraphie
+de `scene/film.js` et le minutage restent écrits en « temps du film ».
 
 ## La voix
 
@@ -39,10 +40,11 @@ tournent sur le processeur, sans service en ligne :
 
 | `moteur` | Modèle | `nom` | Vitesse |
 | --- | --- | --- | --- |
-| `kyutai-1.6b` (choisi) | [Kyutai TTS 1.6B](https://huggingface.co/kyutai/tts-1.6b-en_fr) (français et anglais) | fichier de la banque [`kyutai/tts-voices`](https://huggingface.co/kyutai/tts-voices) : voix d'homme `cml-tts/fr/928_486_000075-0001_enhanced.wav` | ≈ 10 × le temps réel (≈ 30 min pour le film) |
-| `pocket-tts` | [Pocket TTS](https://huggingface.co/kyutai/pocket-tts-without-voice-cloning), français 24 couches (`langue` : `french_24l`) | voix prédéfinie, ex. `estelle` | ≈ temps réel |
+| `pocket-tts` (choisi) | [Pocket TTS](https://huggingface.co/kyutai/pocket-tts-without-voice-cloning), français 24 couches (`langue` : `french_24l`) | voix prédéfinie : `estelle` | ≈ temps réel |
+| `kyutai-1.6b` | [Kyutai TTS 1.6B](https://huggingface.co/kyutai/tts-1.6b-en_fr) (français et anglais) | fichier de la banque [`kyutai/tts-voices`](https://huggingface.co/kyutai/tts-voices), ex. voix d'homme `cml-tts/fr/928_486_000075-0001_enhanced.wav` | ≈ 10 × le temps réel (≈ 30 min pour le film) |
 
-Les graphies phonétiques du champ `dit` dépendent du modèle : avec Pocket TTS (Estelle), « Eupe-pina » et « F E C ».
+Les graphies phonétiques du champ `dit` dépendent du modèle. La voix d'homme essayée avec `kyutai-1.6b` prononçait mal
+« Up'Pina » (« Eup'pina » était lu « EP Pina ») et paraissait peu naturelle une fois accélérée : la vidéo utilise Estelle.
 
 Les modèles sont sous licence **CC-BY 4.0** ; les voix `cml-tts/fr` sont sous CC-BY 4.0, celles enregistrées par
 Kyutai (`unmute-prod-website`) sous CC0. Le champ `credit` est affiché au générique de fin : l'adapter quand on
@@ -91,8 +93,9 @@ Résultat : `build/uppina-accueil.mp4` et `build/uppina-accueil.srt`. Le dossier
 5. `node rendu.js video` : rend la scène animée [`scene/`](scene/) image par image (Chromium) et l'encode en H.264.
    `node rendu.js apercu 12.5 47` produit des images isolées dans `build/apercu/` pour vérifier le montage
    (temps de la vidéo finale).
-6. `python mixage.py` puis l'assemblage ffmpeg de `fabriquer.sh` : voix (accélérée de `vitesse` avec le filtre
-   `atempo` de ffmpeg) + musique (baissée de 12 dB pendant la voix), normalisée à −16 LUFS.
+6. `python mixage.py` puis l'assemblage ffmpeg de `fabriquer.sh` : voix (accélérée seulement si
+   `voix.accelerationMax` > 1, avec le filtre `atempo` de ffmpeg) + musique (baissée de 12 dB pendant la voix),
+   normalisée à −16 LUFS. `./fabriquer.sh son` refait seulement musique, mixage et assemblage.
 
 ## Modifier
 

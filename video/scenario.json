@@ -1,12 +1,14 @@
 {
   "titre": "Les nouveautés de l'accueil Up'Pina",
   "voix": {
-    "moteur": "kyutai-1.6b",
-    "nom": "cml-tts/fr/928_486_000075-0001_enhanced.wav",
-    "credit": "Voix de synthèse : Kyutai TTS 1.6B (CC-BY 4.0), voix issue du corpus CML-TTS (CC-BY 4.0)"
+    "moteur": "pocket-tts",
+    "langue": "french_24l",
+    "nom": "estelle",
+    "accelerationMax": 1.0,
+    "credit": "Voix de synthèse : Pocket TTS, Kyutai (CC-BY 4.0)"
   },
   "vitesse": 1.2,
-  "note": "Chaque module : un carton « Nouveau », une présentation factuelle, puis « L'avantage ». texte = sous-titre affiché ; dit = texte envoyé à la synthèse vocale (orthographe phonétique, réglée pour la voix choisie : Eup'pina, Pop i a, F.E.C.). avantage = texte court du bandeau. vitesse = accélération de tout le film à la sortie (animations, voix étirée sans changer sa hauteur, musique, sous-titres).",
+  "note": "Chaque module : un carton « Nouveau », une présentation factuelle, puis « L'avantage ». texte = sous-titre affiché ; dit = texte envoyé à la synthèse vocale (orthographe phonétique, réglée pour la voix choisie : Eupe-pina, Pop i a, F E C). avantage = texte court du bandeau. vitesse = accélération des animations à la sortie ; voix.accelerationMax = accélération maximale de la voix (1 : voix naturelle).",
   "scenes": [
     {
       "id": "intro",
@@ -15,7 +17,7 @@
         {
           "id": "i1",
           "texte": "Up'Pina : les nouveautés de l'accueil.",
-          "dit": "Eup'pina : les nouveautés de l'accueil."
+          "dit": "Eupe-pina : les nouveautés de l'accueil."
         },
         {
           "id": "i2",
@@ -73,7 +75,7 @@
         {
           "id": "b3",
           "texte": "Up'Pina en déduit le chiffre d'affaires attendu : la moyenne des mêmes jours de la semaine, corrigée par la météo, sur 16 jours.",
-          "dit": "Eup'pina en déduit le chiffre d'affaires attendu : la moyenne des mêmes jours de la semaine, corrigée par la météo, sur seize jours."
+          "dit": "Eupe-pina en déduit le chiffre d'affaires attendu : la moyenne des mêmes jours de la semaine, corrigée par la météo, sur seize jours."
         },
         {
           "id": "b4",
@@ -286,7 +288,7 @@
         {
           "id": "x2",
           "texte": "Les écritures de la période sont préparées au format FEC ou CSV, avec leurs contrôles.",
-          "dit": "Les écritures de la période sont préparées au format F.E.C. ou C.S.V., avec leurs contrôles."
+          "dit": "Les écritures de la période sont préparées au format F E C ou C S V, avec leurs contrôles."
         },
         {
           "id": "x3",

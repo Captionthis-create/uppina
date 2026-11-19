@@ -2,8 +2,8 @@
 mixage.py : place chaque phrase de la voix off à son instant, baisse la musique sous la voix, normalise.
 Le film étant accéléré (vitesse de scenario.json), chaque phrase est accélérée d'autant sans changer sa hauteur
 (ffmpeg, filtre atempo : découpage-recollement adapté à une voix seule) et placée à l'instant temps du film / vitesse.
-L'accélération de chaque phrase est calculée par timeline.js (vitesseVoix) : jusqu'à 3,6 mots par seconde au plus, les
-titres courts gardent donc leur débit naturel, ce que permet le silence qui les suit.
+L'accélération de chaque phrase est calculée par timeline.js (vitesseVoix) : au plus voix.accelerationMax (1 par
+défaut : voix naturelle) et jamais au-delà de 3,6 mots par seconde.
 
 Entrées : build/timeline.json, build/voix/<id>.wav, build/musique.wav
 Sorties : build/mix.wav (avant normalisation), build/audio.wav (−16 LUFS, crête −1,5 dBTP),
